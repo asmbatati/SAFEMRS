@@ -19,7 +19,7 @@ The initial push to https://github.com/asmbatati/SAFEMRS.git failed due to authe
 2. **Update the remote URL with your token**:
    ```bash
    cd "/Users/akoubaa/Dropbox/ScaleX_Dev/PROJECT_PROPOSALS/RESEARCH_SUPERVISIONS/SAFEMRS IROS Paper"
-   git remote set-url origin https://YOUR_GITHUB_TOKEN@github.com/asmbatati/SAFEMRS.git
+   git remote set-url origin https://YOUR_GITHUB_TOKEN@github.com/aniskoubaa/SAFEMRS.git
    ```
    Replace `YOUR_GITHUB_TOKEN` with the token you just copied.
 
@@ -44,7 +44,7 @@ The initial push to https://github.com/asmbatati/SAFEMRS.git failed due to authe
 3. **Update the remote URL**:
    ```bash
    cd "/Users/akoubaa/Dropbox/ScaleX_Dev/PROJECT_PROPOSALS/RESEARCH_SUPERVISIONS/SAFEMRS IROS Paper"
-   git remote set-url origin git@github.com:asmbatati/SAFEMRS.git
+   git remote set-url origin git@github.com:aniskoubaa/SAFEMRS.git
    ```
 
 4. **Push to GitHub**:
@@ -91,7 +91,7 @@ git remote -v
 ## Current Status
 
 - ✅ Git repository initialized
-- ✅ Remote added: https://github.com/asmbatati/SAFEMRS.git
+- Remote added: https://github.com/aniskoubaa/SAFEMRS.git
 - ✅ Initial commit created
 - ⏳ Waiting for authentication setup
 - ⏳ Pending: Push to remote
@@ -101,10 +101,8 @@ git remote -v
 1. Choose an authentication method above
 2. Set up authentication
 3. Run: `git push -u origin main`
-4. Verify at: https://github.com/asmbatati/SAFEMRS
+4. Verify at: https://github.com/aniskoubaa/SAFEMRS
 
 ---
 
-**Note**: Make sure you have permission to push to the `asmbatati/SAFEMRS` repository. If you don't own this repository, you may need to:
-- Fork it to your own account, or
-- Ask the repository owner to add you as a collaborator
+**Note**: The repository has been successfully created at https://github.com/aniskoubaa/SAFEMRS

@@ -47,13 +47,25 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Configure remote URL with token if GITHUB_TOKEN is set
+if [ -n "$GITHUB_TOKEN" ]; then
+    echo -e "${GREEN}Using GitHub token from environment...${NC}"
+    CURRENT_URL=$(git remote get-url origin)
+    if [[ $CURRENT_URL == https://* ]]; then
+        # Extract repo path (remove https:// and any existing token)
+        REPO_PATH=$(echo "$CURRENT_URL" | sed -E 's|https://([^@]*@)?||')
+        git remote set-url origin "https://${GITHUB_TOKEN}@${REPO_PATH}"
+    fi
+fi
+
 # Push to remote
 echo -e "${GREEN}Pushing to remote repository...${NC}"
 git push origin main
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Push failed! You may need to pull first or set upstream.${NC}"
-    echo -e "${YELLOW}Try running: git push -u origin main${NC}"
+    echo -e "${YELLOW}Try running: git pull --rebase origin main${NC}"
+    echo -e "${YELLOW}Then run this script again.${NC}"
     exit 1
 fi
 
