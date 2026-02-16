@@ -1,0 +1,1156 @@
+--- Page 1 ---
+FCRF: Flexible Constructivism Reflection for Long-Horizon Robotic
+Task Planning with Large Language Models
+Yufan Song1†, Jiatao Zhang1†, Zeng Gu2, Qingmiao Liang2, Tuocheng Hu1, Wei Song1⋆, and Shiqiang Zhu1⋆
+Abstract— Autonomous error correction is critical for domes-
+tic robots to achieve reliable execution of complex long-horizon
+tasks. Prior work has explored self-reflection in Large Language
+Models (LLMs) for task planning error correction; however,
+existing methods are constrained by inflexible self-reflection
+mechanisms that limit their effectiveness. Motivated by these
+limitations and inspired by human cognitive adaptation, we
+propose the Flexible Constructivism Reflection Framework
+(FCRF), a novel Mentor-Actor architecture that enables LLMs
+to perform flexible self-reflection based on task difficulty, while
+constructively integrating historical valuable experience with
+failure lessons. We evaluated FCRF on diverse domestic tasks
+through simulation in AlfWorld and physical deployment in
+the real-world environment. Experimental results demonstrate
+that FCRF significantly improves overall performance and
+self-reflection flexibility in complex long-horizon robotic tasks.
+Website at https://mongoosesyf.github.io/FCRF.github.io/
+I. INTRODUCTION
+Robotic task planning constitutes a fundamental capa-
+bility for high-level decision-making, enabling robots to
+generate executable action sequences through environmental
+perception, capabilities, and task objectives [1]. Domestic
+robots increasingly assume critical roles in assistive human
+living, which interact with various objects and generate
+longer action sequences, often leading to numerous errors
+that accumulate over time [2]. This characteristic highlights
+the need for autonomous error correction to ensure stable
+execution of complex long-horizon task planning.
+In recent years, powered by massive data training, rapidly
+developed LLMs possess encyclopedic world knowledge and
+situated language comprehension capabilities, enabling their
+application in robotic task planning [3], [4], [5]. LLMs en-
+hance robotic planning and reasoning capabilities, allowing
+direct interaction with task instructions in natural language
+and improving overall task planning performance. This leads
+us to ask: can an LLM agent with self-reflection capabilities
+be designed to autonomously correct errors and optimize
+actions for domestic robots task planning, thereby better
+addressing the complex needs of long-horizon tasks?
+Several existing studies have explored self-reflection
+mechanisms for error correction in the LLM task plan-
+ning process. Foundational approaches include RETRO-
+FORMER [6], and Reflexion [7] based on ReAct [8] actor,
+processing reflection gradients through textual representa-
+tions. Another series of works [9], [10], [11] combine tree
+1Zhejiang University, Hangzhou, China
+2Hangzhou Institute for Advanced Study, University of Chinese Academy
+of Sciences, Hangzhou, China
+⋆Corresponding emails: {weisong-rob,sqzhu}@zju.edu.cn
+† Contribute equally to this work.
+Failed Trajectory with Valuable Experience
+Observation & Task Goal
+You are in the middle of a room, you see ...
+Your task is to : put a clean knife in countertop.
+Task Plan
+> Open drawer 1
+    - You see nothing in drawer 1.
+> ...
+> Open drawer 6
+    - You see a knife in drawer 6.
+STATUS: FAIL
+(Failed reason: Found the object, but exhausted 
+permitted exploration steps for further operations.)
+Failed Trajectory with Core Logical Error
+Observation & Task Goal
+You are in the middle of a room, you see ...
+Your task is to : put two peppershakers in drawer.
+Task Plan
+> ...
+> Put peppershaker 1 in drawer 1
+> Put peppershaker 2 in drawer 2
+    - Nothing happens.
+STATUS: FAIL
+(Failed reason:Violated constraints, the two objects 
+should be put into the same container.)
+Reflection Result with Fixed Intensity
+Reflection Content
+In this environment, my plan was to...
+I did not account for the possibility of not finding a dirty knife. 
+In my new plan, I’ll first check the garbagecan for a dirty knife.
+New Task Plan
+> Go to garbage 1
+    - You see nothing.
+> Open drawer 1
+> ...
+> Open drawer 5
+STATUS: FAIL
+Reflection Result with Fixed Intensity
+Reflection Content
+In this environment, my plan was to...
+However, there seemed to be a technical issue preventing me.
+In the future, I will try to find an alternative solution, such as 
+finding a different location or object to complete the task.
+New Task Plan
+> ...
+> Take peppershaker 2 from desk 1
+> I will find an alternative solution to complete the task. One 
+possible alternative could be to put peppershaker 2 in drsser 1.
+> Put peppershaker 2 in dresser 1
+    - Nothing happens.
+STATUS: FAIL
+Discards valuable experience,
+exhausts more steps for exploration
+Overlooks the core error, 
+leading to worse reflection result
+The Reflection Template with Fixed Intensity
+In this environment, my plan was ... However, I made mistake when I... In the next trial, I will ...
+Excessive self-reflection, 
+discards valuable experience 
+Inadequate self-reflection, 
+overlooks core errors
+Fig. 1.
+Illustration of the flexibility problem of self-reflection during long-
+horizon LLMs task planning. If LLMs always reflect at a fixed intensity,
+they may discard valuable experience in minor error scence or overlook
+core errors, leading to suboptimal reflection even worse planning results.
+search with reflection to deliberately seek a better solution.
+Recently, works like Expel [12] and AutoManual [13] build
+rule systems according to the task environment, leading to
+comprehensive reflection on previous errors of LLM agents.
+Although previous methods show promising results, a
+key challenge in applying LLMs for self-reflection to com-
+plex long-horizon task planning is their lack of flexibility.
+Specifically, current frameworks typically employ a fixed
+reflection paradigm, failing to adjust the intensity of reflec-
+tion according to the nature of the errors. In long-horizon
+robotic tasks, the severity of errors varies significantly across
+different trajectories. For example, some failures result from
+insufficient exploration, where most actions are correct and
+only minor adjustments are needed. In such cases, a light
+reflection suffices. In contrast, failures caused by funda-
+mental logical errors require more intensive reflection and
+substantial modifications to the trajectory. Therefore, it is
+crucial for LLMs to integrate deeply with the current task
+trajectory and adaptively adjust the reflection process. As
+illustrated in Figure 1, if LLMs reflect at a fixed intensity
+in complex long-horizon tasks, they risk discarding valuable
+experience or overlooking the root cause of errors, leading to
+suboptimal reflection and, ultimately, worse planning results.
+Motivated by the challenges mentioned, we investigate
+the flexibility of LLMs’ self-reflection in complex long-
+horizon robotic task planning. Humans similarly encounter
+varying degrees of error severity in long-horizon tasks. When
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2025)
+October 19-25, 2025. Hangzhou, China
+979-8-3315-4393-8/25/$31.00 ©2025 IEEE
+5462
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) | 979-8-3315-4393-8/25/$31.00 ©2025 IEEE | DOI: 10.1109/IROS60139.2025.11246083
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 2 ---
+errors occur, humans review their actions, analyze useful
+experience, and integrate external knowledge to refine both
+successes and failures, reflecting with appropriate intensity
+to correct the errors. This characteristic extends to widely
+recognized constructivist learning theory [14], as recognized
+in educational psychology, underscores that effective learning
+integrates new and prior experience within the task context.
+For example, when human students make mistakes, a good
+educator first acknowledges the correct aspects of their
+work, then addresses specific errors by drawing on relevant
+knowledge from a broader system to guide the students. This
+helps students integrate new and old experience, fostering an
+appropriately intense reflection.
+Inspired by the aforementioned process, we propose the
+Flexible Constructivism Reflection Framework (FCRF), an
+online approach enabling LLMs to perform flexible self-
+reflection based on task difficulty. Our method draws from
+constructivist learning, using a Mentor-Actor LLM archi-
+tecture for online reflection. The Actor LLM follows the
+ReAct [8] framework for action planning, while the Mentor
+LLM guides the reflection process for error correction. The
+Mentor summarizes successful experience from the trajectory
+of Actor and extracts failure lessons from corrected trajec-
+tories, maintaining a universal Lesson Pool. Focusing on the
+issue of flexibility, our framework includes a complexity
+assessment module, allowing the LLM to select reflection
+intensity tailored to evaluated task difficulty. Once reflec-
+tion intensity is determined, valuable experience and failure
+lessons are constructively integrated into a new plan, guiding
+the Actor LLM in the planning of next trail.
+To evaluate the performance of our framework, we per-
+form experiments in AlfWorld [15] household planning tasks.
+We divide all the tasks in the dataset into six categories
+according to their operation type. The results show that
+our framework achieves the best performance on all tasks,
+and improves 31.2% reflection flexibility, 25.0% valuable
+experience recall and 63.3% error correction precision. In
+summary, the contributions of our work are as follows:
+1) To the best of our knowledge, we are the first to define
+and research the flexibility problem of LLMs reflection
+for complex long-horizon robotic task planning.
+2) We propose a novel Flexible Constructivism Reflection
+Framework (FCRF), which dynamically determines the
+intensity of reflection based on task complexity and
+integrates feedback from task success or failure for
+adaptive and efficient self-reflection processes.
+3) We introduce a Mentor-Actor reflection architecture,
+where the Mentor leverages a lesson pool, a general-
+ized knowledge base across scenarios. This base may
+contain new knowledge for human, and supports multi-
+ple maintenance methods, including human knowledge
+injection and LLM-based summarization.
+4) We validate our proposed method in both AlfWorld
+simulation environments and real-world robotic ex-
+periments, demonstrating that our framework signif-
+icantly improves task performance and adaptability
+under complex and diverse conditions.
+II. RELATED WORKS
+A. LLMs for Task Planning
+Several prior works have employed LLMs for task plan-
+ning, on account of their inherent powerful reasoning and
+planning capabilities. For instance, classic LID [16] uses
+pre-trained GPT-2 [17] as a general framework for interac-
+tive decision making, by converting policy inputs including
+observations, goals, and history into sequential data. These
+embeddings are then passed to a pre-trained policy net-
+work to predict actions. ReAct [8] combines reasoning and
+acting with language models for solving diverse language
+reasoning and decision making tasks. Several later works like
+CodeAsPolicy [18], ProgPrompt [19] and AdaPlanner [20],
+consider the powerful programming capability of LLMs,
+propose to use programmatic code as the plan of LLMs.
+Focusing on the combination of robots and LLMs, typical
+embodied robotic work SayCan [3] extracts and leverages
+the knowledge within LLMs in physically-grounded tasks,
+constraining the model to propose natural language actions
+that are both feasible and contextually appropriate. A series
+of other works including LLMPlanner [21], [22] also develop
+LLMs for use in robotic planning tasks.
+B. LLM Agents for Self-Reflection
+Developed from simple planning strategies, a series of
+later studies adopt self-reflection methods, using feedback
+to perform multistep planning and error correction of LLM
+agents. For example, improved on the ReAct reasoning
+framework, Reflexion [7] allows LLMs to reflect on their
+previous failures according to environmental feedback, form-
+ing an improved plan for the next attempt. Based on the
+Reflexion framework, recent work Expel [12] builds an
+offline learning process, the LLM agent gathers experience
+from a collection of training tasks through trial and error. Au-
+toManual [13] builds a well-organized understanding of the
+environment that can guide multitask planning effectively.
+Another series of works [9], [10], [11] combine tree search
+with reflection to seek a better solution to the task.
+III. PRELIMINARIES
+A. Planning Framework
+A task can be defined as a tuple ⟨G, S, O, T, A⟩[23],
+where G represents the task goal, S represents the set of
+all possible states, O is the set of observations of task
+environment, A is the set of possible actions, and T is the
+transition function, formally formalized as T : S × A →
+S, represents the environmental state changes because of
+actions. The objective is to find a plan π, in the form
+of a sequence of actions, that transitions from the initial
+state to the target state. There is currently no unified and
+strict definition of complex long-horizon tasks. Based on
+the summary of existing methods, we can generally define
+tasks with more than 10 steps or even longer, simultaneously
+interacting with a greater variety of items and environments,
+as complex long-horizon tasks [24].
+5463
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 3 ---
+Valuable Experience
+Lesson Pool
+Constructive Plan
+Actions
+Obs/Reward
+Failure Lesson
+In-Depth Reflection
+（End k2 episodes）
+Simple Reflection
+（Top k1 episodes）
+Update Lessons
+Extract
+Mentor LLM
+Memory
+����= ����(�, ��, �)
+�����= �����(�, ��, ����, �������, �)
+�������= �������(�, ��, ���, �)
+�����
+���= �������({��1
+�, . . . , ���
+�
+}, �)
+Environment
+Actor LLM
+��= ��(�, ��, ��, ���−1, �)
+Fig. 2.
+The framework of FCRF. The planning process is executed by the Actor LLM, the reflection process is executed by the Mentor LLM. During
+the self-reflection process, the difficulty level of the task is first assessed, according to which the Mentor flexibly selects reflection intensity, determine the
+proportion of simple experience retain and in-depth failure lessons extraction among all the reflection episodes. Combining the valuable experience and
+failure lesson, the Mentor performs a constructivism self-reflection to guide the next round of planning of the Actor. The reflection results and planning
+trajectories will be stored in the memory module for long-term management.
+B. Self-Reflection Process in LLMs Planning
+Discussing
+LLMs
+task
+planning
+process
+with
+self-
+reflection and memory module mem, the self-reflection
+content for current unsuccessful planning trail srt ∈SR
+is generated by the LLM for self-reflection Msr, while the
+reflection process can be described as Msr(srt|st, memt),
+meaning that the self-reflection content srt of the current
+trail t is generated by Msr based on the current state st,
+and persistent memory memt lasts until the current trail
+including existing task trajectory.
+The self-reflection generated by Msr would be stored
+in the agent memory mem and passed to planner LLM
+in
+the
+next
+trail,
+to
+generate
+better
+action
+sequence
+{at+1
+1
+, . . . , at+1
+i
+} as the new output of the planning task.
+The sequence of actions is generated by the strategy func-
+tion Φ(at+1
+1
+, . . . , at+1
+i
+|G, st+1, ot+1, srt), meaning that new
+action sequence {at+1
+1
+, . . . , at+1
+i
+} from step1 to stepi is
+generated based on the task goal G, the current agent state
+st+1, the current observation of task environment ot+1, and
+the generated self-reflection content srt of last failed trail.
+IV. METHODOLOGY
+In this section, we present the details of our framework
+Flexible Constructivism Reflection Framework (FCRF). As
+illustrated in Figure 2, our FCRF is a Mentor-Actor architec-
+ture that consists of four parts: an LLM as planning Actor,
+an LLM as self-reflection Mentor, the memory management
+module and the overall flexible reflection process. These
+modules will be introduced specifically in the following.
+A. LLM as Actor
+Following the architecture of the classic Reflexion method,
+our planning process is completed by an LLM prompted as
+an Actor, represented as Ma in the following. Ma takes task
+goal, current environmental observations and reflection text
+of previous failed task trails as inputs, and is specifically
+prompted to generate action sequence in text form as output.
+This planning process of Ma can be described as:
+At = Ma(G, st, ot, SRt−1, θ),
+(1)
+where At = {at
+1, . . . , at
+i} denotes the current action se-
+quence, G represents the task goal, ot represents the cur-
+rent environmental observations during trail t, SRt−1 =
+{srt−k, . . . , srt−1} represents the set of self-reflection
+among the past k trials to consider about, and θ represents the
+parameters of Ma. The action sequence generated by Actor
+LLM Ma would be stored in the memory module mem for
+the following self-reflection process of the task, until the
+current task is successfully completed.
+B. LLM as Constructivism Self-Reflection Mentor
+The constructivism self-reflection process of our frame-
+work is guided by an LLM prompted as a Mentor, rep-
+resented as Mm, which contains three sub-modules Mexp,
+Mlesson and Mcons. The reflection process is divided into
+three parts: the summary of valuable experience, the sum-
+mary of failure lessons, and the comprehensive construction
+of the two above parts. The final generated reflection content
+will be added to the memory module mem and can be called
+by the Actor LLM Ma in subsequent trails for planning.
+The valuable experience summary process is completed
+by the submodule Mexp. Mexp analyzes the current trail
+trajectory planned by Ma, summarizing effective interaction
+attempts contained in the unsuccessful trail, then retains them
+as valuable experience and integrates them into the memory,
+5464
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 4 ---
+Task Goal
+Goal: find a knife and clean it.
+Historical Failed Trajectory 
+�� : go to countertop 1
+�� :On the countertop 1, you see a creditcard 1.
+�� : go to countertop 2
+�� : On the countertop 2, you see a butterknife 1.
+�� : open drawer 3
+�� : You open the drawer 3. In it, you see a knife 1.
+...
+��+� : take knife 1 from drawer 3
+��+� : You pick up the knife1 from the drawer 3.
+��+� : think: Now I take a knife (1). Next, I need to 
+clean it with some water in the pot.
+��+� : OK.
+��+� : take pot 1 from shelf 1.
+��+� : Nothing happens.
+Failed Feedback
+Trial End
+STATUS: FAIL (erroneous interaction)
+Difficulty Measure
+Valuable Experience Summary
+Lesson Pool
+Comprehensive Construction 
+Input
+Reflection Output
+�
+��
+Task Goal
+Trajectory
+����
+Valuable Experience
+My plan was...
+I have already achieved find a knife, which 
+means directly go to drawer 3 for knife 1.
+Failure Lesson Summary
+Replan Trajectory 
+�� : go to drawer 3
+�� : In drawer3, you see a knife 1.
+Input
+Reflection Output
+It’s a clean task. According to the lesson 
+pool, I should use the sinkbasin to clean, but 
+not the pot with water in it. 
+�
+��
+Task Goal
+Trajectory
+�������
+Failure Lesson
+�� : clean knife 1 with sinkbasin 1
+�� : You clean the knife 1 using sinkbasin 1.
+STATUS: OK
+Input
+�
+��
+Task Goal
+Trajectory
+����
+Valuable Experience
+�������
+Failure Lesson
+Reflection Output
+�����
+Constructive Plan
+Combine the valuable experience and the 
+failure lesson, my total plan for the next 
+trail is, go to drawer 3 for knife 1, then go to 
+sinkbasin 1 to clean the knife 1.
+�� : think: Now I find a knife (1). Next, I will 
+go to sinkbasin 1 to clean it.  
+�� : OK.
+...
+[clean]: I should go to the  
+sinkbasin and use it to clean.
+[put two]: The objects should 
+be put into the same container.
+...
+���������� ��������� ��, ��
+= ��������(����, ������, ��������)
+No / Replan
+Yes / Update
+Simple reflection
+(top k1 episodes)
+In-depth reflection
+(end k2 episodes)
+���
+Lesson Pool
+[put]: Open the container 
+before putting the object in it.
+Success?
+Fig. 3.
+The detailed illustration of FCRF. The difficulty level of the task is first assessed, determining the number of episodes for simple and in-depth
+reflection. After the reflection intensity is determined, the detailed self-reflection process consists of the valuable experience summary process, the failure
+lesson summary process and the comprehensive construction process. Final output of the self-reflection process is a improved new plan for the next attempt.
+for usage in the construction of subsequent reflection content.
+The process can be described as:
+Expt = Mexp(G, τ t, θ),
+(2)
+where G represents the task goal, τ t represents the trajectory
+of current trail t, θ represents the parameters of Mexp, mainly
+embodies through prompt.
+The failure lesson summary process is completed by the
+submodule Mlesson, specifically divided into the preliminary
+maintenance of the mentor lesson pool and the failure lesson
+extraction process. The mentor lesson pool is expressed as
+LP, which can be regarded as a universal knowledge base
+of the task environment. During the lesson pool maintenance
+process, Mlesson accesses the existing cross-task trajectories
+stored in memory online, summarizing scenario universal
+failure lessons from all trajectories that have been success-
+fully corrected by the episode in which the current trail
+locates, then incrementally add the new lesson to LP. The
+failure lesson summary process can be described as:
+LP t = Mlesson({τ t
+m1, . . . , τ t
+mk}, θ),
+(3)
+where LP t represents the up-to-date lesson pool set up to
+trail t, {τ t
+m1, . . . , τ t
+mk} represents all k successfully modified
+task trajectories in the current trail t, θ represents the
+parameters of Mlesson, mainly embodies through prompt.
+During the failure lesson extraction process, Mlesson com-
+bines the current task goal to analyze the current trail task
+trajectory, then extracts a lesson tip that best fits the cause
+of the current task failure from the lesson pool maintained
+so far, as external information for failure reflection. The
+failure lesson will be used in the construction of subsequent
+reflection content together with valuable experience Expt.
+The process of failure lesson extraction can be expressed as:
+Lessont = Mlesson(G, τ t, LP t, θ),
+(4)
+where G represents the task goal, τ t represents the trajectory
+of current trail t, LP t represents the up-to-date lesson pool
+set up to trail t, θ represents the parameters of Mlesson,
+mainly embodies through prompt.
+After completing the valuable experience summary pro-
+cess and the failure lesson summary process, the constructor
+submodule Mcons will execute the comprehensive con-
+struction process to comprehensively construct the success-
+ful and failed experience, integrate the final reflection result
+in the form of an improved plan. During the construction
+process, Mcons integrates the summarized valuable experi-
+ence Expt with the newly injected Lessont, unifying them
+into a sequence of actions, which forms the new constructive
+plan to be executed in the next trail. The reflected new
+constructive plan will be stored in the mem module and
+guide the planning process of Mactor in the next trail. The
+comprehensive construction process can be described as:
+Plant = Mcons(G, τ t, Expt, Lessont, θ),
+(5)
+where G represents the task goal, τ t represents the trajectory
+of current trail t, Expt and Lessont respectively represents
+the valuable experience and the precisely required failure les-
+son summarized through trail t, θ represents the parameters
+of Mcons, mainly embodies through prompt.
+C. Memory Management
+During the task planning process, it is important for
+LLMs to maintain context memory. However, if all memory
+contents are included in prompts, it will lead to redundant
+prompts, increasing the memory burden of LLMs, even
+affect their performance. Motivated by the long-short-term
+5465
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 5 ---
+memory mechanism of previous work Reflexion, we de-
+sign the memory module mem for comprehensive memory
+management, which is equivalent to an external buffer of
+LLMs. The mem is divided into trajectory management
+module Trajt and reflection management module Reflt,
+comprehensively manages the memory of task trajectories
+and reflection contents. The Trajt module is a short-term
+memory module storing the task trajectory τ t of the current
+trail t. The Reflt module is a long-term memory module
+storing all failure self-reflection contents up to trail t, which
+can be represented as {sr1, . . . , srt}. The reflection contents
+are stored for targeted reading and calling by the Mentor
+LLM Mm in the following trails. Our memory mechanism
+mem relieves the memory pressure of LLMs, improving the
+efficiency of memory management and reflection process.
+D. The Flexible Reflection Process
+As an important innovation, our framework adopts a
+flexible self-reflection process. For tasks with different diffi-
+culties, our method adopts reflection frameworks of different
+intensities. We design the model Mcomplex to calculate the
+difficulty level of the task and thus determine the propor-
+tion of simple reflection and in-depth reflection. Reflection
+on simple tasks emphasizes exploration based on valuable
+experience, while reflection on difficult tasks emphasizes the
+infusion of external failure lessons. The specific difficulty
+level assessment process can be expressed as:
+DL = Mcomplex(type, numobj, numinter),
+(6)
+where type represents the type of current task, numobj
+and numinter respectively represents the number of target
+objects and the number of interactions that need to be
+performed within the task. Among all episodes eptotal, the
+number of episodes for in-depth reflection is represented as:
+k2 = eptotal ·
+numobj + numinter
+max
+
+numobj(t) + numinter(t)
+ t ∈T
+ (7)
+and the number of episodes for simple reflection k1 =
+eptotal −k2. The task difficulty assessment and detailed
+constructivism reflection process are illustrated in Figure 3.
+V. EXPERIMENTS
+In this section, we evaluate our framework by conduct-
+ing experiments in common household environment Alf-
+World [15]. Furthermore, we perform real-world robotic ex-
+periments to verify the practicability of our method in the real
+world environment. Our approach demonstrates significant
+advantages in overall performance and specific metrics.
+A. Experimental Setup
+Environment. We conduct our evaluation on AlfWorld,
+a text-based virtual household environment containing six
+types (these types would be shown in next part). We test
+our framework and baselines on entire 134 tasks across all
+six types in five epochs of planning trails, demonstrating
+the superiority of our framework in terms of reflection
+performance and success rate through all methods.
+Dataset. In AlfWorld, we conduct experiments on the
+entire dataset including six types of household tasks: Pick &
+Place, Examine in Light, Clean & Place, Heat & Place, Cool
+& Place, and Pick Two & Place. We perform experiments
+on all 134 tasks in the environment to obtain results.
+Compared methods. We compare our method with three
+categories of previous methods as main baselines on long-
+horizon planning tasks: 1. Planning-Only: ProgPrompt [19],
+which LLM receives task descriptions in text form as input,
+and directly outputs action sequence as planning result
+based on the In Context Learning (ICL) [25] principle.
+2. Reasoning-Only: ReAct [8], which combines reasoning
+and acting processes with LLMs, generating the next action
+based on reasoning. 3. Reasoning-Reflection: Reflexion [7],
+which allows LLMs to reflect on their previous failures in
+ReAct trails according to environmental feedback, in order
+to form an improved plan for the next attempt. The SOTA
+method Expel [12] is also included in this category of self-
+reflection methods, while the overall success rate of our
+method exceeds it on up-to-date GPT-4 series models.
+Metrics. We evaluated the methods from three aspects:
+Success Rate wholely evaluates the effectiveness of reflec-
+tion and planning processes through calculating the propor-
+tion of tasks that are completed successfully to the end of
+trail. Flexibility metric includes the Average Value (AVE)
+and Standard Deviation (STD) of generated self-reflection
+length, modeling the ability to manage reflection flexibly
+based on the difficulty of various tasks. Efficiency metric in-
+cludes redefined Experience Recall and Correction Precision
+during the self-reflection process in terms of action sequence
+level. The Experience Recall metrics the ability to retain
+valuable experience during the self-reflection process, which
+can be represented as Recallexp = Cretained
+Cinitial , where Cretained
+denotes the number of correct actions finally retained in the
+new plan that given by the reflection results, and Cinitial
+denotes the number of correct actions initially included in
+the ultimately failed action sequence. The Correction Pre-
+cision measures the ability to accurately correct wrong steps
+during the self-reflection process, which can be represented
+as Precisioncorr =
+Ecorrected
+Etotal , where Ecorrected denotes the
+number of erroneous actions being corrected through the
+reflection process, and Etotal denotes the total number of
+erroneous actions in the ultimately failed action sequence.
+B. Main Results
+The main results are presented in Table I and Table II.
+Balancing performance and computational resource con-
+sumption, all experiments are performed using the newest
+officially recommended GPT-4o mini model. We can observe
+that: 1. Our FCRF outperforms other methods on all tasks
+and metrics, denoting the ability of our method to enhance
+the overall success rate of planning, through performing
+flexible self-reflection according to task difficulty, and con-
+structively integrates experience of both success and failure
+during the reflection process. An illustrative case of FCRF
+5466
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 6 ---
+TABLE I
+SUCCESS RATE OF FCRF AND BASELINES ACROSS VARIOUS ALFWORLD TASKS. OUR FCRF OUTPERFORMS OTHER METHODS ON ALL TASKS.
+Methods
+Put
+Clean
+Heat
+Cool
+Examine
+Put two
+ALL SR(%)
+Planning-Only
+64.5
+66.6
+30.0
+62.5
+26.6
+35.7
+68.6
+Reasoning-Only
+84.6
+87.5
+77.1
+93.3
+58.3
+88.8
+82.8
+Reasoning-Reflection
+76.9
+84.3
+80.0
+93.3
+58.3
+96.2
+83.5
+Ours
+87.5
+90.0
+93.5
+100
+63.6
+97.0
+91.0
+TABLE II
+FLEXIBILITY AND EFFICIENCY OF DIFFERENT REFLECTION METHODS. OUR FCRF DEMONSTRATES SIGNIFICANTLY HIGHER FLEXIBILITY AND
+EFFICIENCY UNDER THE CONDITION OF A 9.7% INCREASE IN COMPUTATIONAL POWER CONSUMPTION.
+Methods
+Flexibility
+Efficiency
+AVE(words)
+STD(words)
+Recallexp(%)
+Precisioncorr(%)
+Reasoning-Reflection
+371.1
+199.9
+75.0
+32.1
+Ours
+407.2
+262.2
+100.0
+95.4
+Look for peppershaker 1 everywhere
+Put peppershaker 1 in drawer 1
+Look for peppershaker 2
+Take peppershaker 1
+Exhausted steps
+FAIL
+Still look for peppershaker 1 everywhere
+Put peppershaker 1 in drawer 1
+Take peppershaker 1
+Hallucination, go to cabinet 2 for peppershaker 2
+FAIL
+Put peppershaker 1 in drawer 1
+Directly go for peppershaker 1
+Directly go for peppershaker 2
+Put peppershaker 2 in drawer 2
+FAIL
+Put peppershaker 2 in drawer 1
+SUCCESS
+Failed trajectory: 
+Put two 
+peppershakers 
+in the drawer
+Reasoning-Reflection: 
+General reflection with 
+fixed intensity, 
+still failed
+Our FCRF: 
+Flexible, efficient 
+reflection constructing
+valuable experience 
+and failure lessons
+Simple reflection, retain valuable experience to save steps
+Targeted in-depth reflection, precisely correct specific error
+Invalid reflection, does not retain experience, and incorrectly defines the core error
+Lesson Pool: 
+ ...usually put things in the 
+same designated container...
+Find and put peppershaker 1, look for peppershaker 2 everywhere, saw peppershaker 2 but exhausted permitted steps
+Fig. 4.
+Comparison of reflection methods in an AlfWorld example. Faced with the failed trajectory, the Reasoning-Reflection method performs invalid
+reflection with inappropriate fixed intensity, which discards experience and fabricates a failure reason. While our FCRF first performs simple reflection,
+summarizing valuable experience to save steps, then FCRF precisely extractes lesson for the error under an in-depth reflection, finally corrects the trajectory.
+applied to a long-horizon task is shown in Figure 4, which
+intuitively demonstrates the superiority of FCRF compared
+to the baseline method. 2. There is a noticeable trend that
+weaker self-reflection flexibility and efficiency correspond to
+an overall lower success rate, which demonstrates the neces-
+sity of our research topic and the rationality of metrics we
+defined. 3. Among all the evaluated methods, the Planning-
+Only method performs simple planning based on inputs
+and contexts, resulting in a relatively weakest overall suc-
+cess rate. The Reasoning-Only and Reasoning-Reflection
+methods achieve better results, with the overall performance
+of the Reasoning-Reflection method being slightly better
+than Reasoning-Only. However, in some task categories,
+Reasoning-Reflection performs worse than Reasoning-Only,
+demonstrating that self-reflection with fixed templates and
+strength does not always effectively correct planning errors.
+4. Differently from the methods mentioned above, our FCRF
+can flexibly select the intensity of reflection based on the dif-
+ficulty of the task and constructively integrate the experience
+of success and failure, thus broadening the overall success
+rate of varying difficulty tasks, compared to methods of all
+other categories, as shown in Table I. More specifically, as
+shown in Table II, our volume of reflection contents varies
+more due to the difficulty of task, meanwhile, the average
+reflection length is only slightly higher than Reasoning-
+Reflection methods category, demonstrating the flexibility
+and superior cost-performance ratio of our framework. The
+efficiency metric shows that our approach has a higher ef-
+fective experience recall and core error correction precision,
+demonstrating the capability of our method in constructing
+valuable experience and failure lessons, which benefits the
+overall efficacy of self-reflection.
+VI. ANALYSIS AND DISCUSSION
+A. Episode Analysis of Self-Reflection Process
+We perform episode analysis experiments to specifically
+analyze the detailed mechanisms and manifestations of the
+self-reflection process, as shown in Figure 5. We instruct the
+LLM to continuously replan all erroneous long-horizon tasks
+over five rounds of experiments, and observe the completion
+status on these five episodes. Our observations are as follows.
+1. As shown in the left image, our FCRF consistently
+5467
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 7 ---
+40%
+60%
+80%
+100%
+1
+2
+3
+4
+5
+Success Rate
+Episode
+Planning-Only
+Reasoning-Only
+Reasoning-Reflection
+FCRF
+0%
+20%
+40%
+60%
+80%
+100%
+1
+2
+3
+4
+Reflection Efficiency
+Episode
+FCRF Recall
+FCRF Precision
+Reflection Recall
+Reflection Precision
+Fig. 5.
+Result of success rate and reflection efficiency with different
+episodes. Our FCRF outperforms in all episodes, converges more quickly
+and has a significant better efficiency.
+outperforms the baselines in all episodes and converges
+more quickly, demonstrating that our method possesses su-
+perior performance and robustness together with a better
+computational cost efficiency. 2. In all episodes, the simple
+Planning-Only method exhibits the weakest error correction
+performance, the Reasoning-Only and Reasoning-Reflection
+methods achieve performance improvements, but there is no
+noticeable gap between the two methods. 3. As shown in the
+right image, our FCRF has a significantly stronger ability to
+recall valuable experience in the trajectory. After the lesson
+pool has been constructed online, our FCRF demonstrates
+significantly higher precision in error correction. This further
+illustrates that reflection process with fixed intensity is not
+always necessarily conducive to error correction, while our
+implementation of reflection flexibility and the integration of
+valuable experience together with failure lessons are indeed
+conducive to the self-reflection process.
+B. Ablation Study
+TABLE III
+ABLATION OF MODULES OF FCRF IN ALFWORLD TASKS. ALL
+DESIGNED MODULES CONTRIBUTE TO THE PERFORMANCE.
+SR
+AVE
+STD
+Recallexp(%) Precisioncorr(%)
+Ours Full
+91.0 407.2 262.2
+100.0
+95.4
+w/o Experience 87.3 238.4
+82.8
+37.5
+88.9
+w/o Lesson
+88.8 276.2 110.7
+100.0
+20.0
+To fully demonstrate the effectiveness of each module in
+our framework and to explore the interrelationships between
+them, we perform ablation studies on the full AlfWorld
+dataset, and the results are detailed in Table III. In the w/o
+Experience model, the action sequence is planned without
+extracting valuable experience. Compared to the complete
+model, the overall success rate decreases by 3.7%. The ability
+to recall valuable experience obviously reduces to 37.5%,
+while the ability to precisely correct errors still exists. In the
+w/o Lesson model, the action sequence is planned without
+using failure lesson, the success rate decreases by 2.2%. The
+ability to precisely correct errors reduces to 20% while the
+ability to recall the experience is still great. The flexibility of
+the method decreases when each module is ablated, leading
+to a decrease of overall success rate, but the performance
+of each ablated model is still better than other baselines.
+Altogether, results of the ablation study met expectations on
+each metric, demonstrating the effect of each module in our
+method, and showing that our framework the whole is greater
+than the simple sum of its parts.
+C. The Extracted Lesson Pool Result
+In our Mentor-Actor reflection architecture, as mentioned
+in methodology section, the Mentor LLM visits successfully
+corrected trajectories of the Actor LLM through an online
+process, extracting a lesson pool to guide the subsequent
+reflection. The automatically extracted lesson pool is equiv-
+alent to a generalized knowledge base in task scenarios,
+which may contain environmental constraints that humanity
+has not yet recognized, thus possesses the significance of
+retention and generalization. The lesson pool obtained during
+our experimental process is partly displayed in Figure 6.
+[puttwo]: When tasked with finding multiple items, prioritize locating 
+and placing each item in the same designated container sequentially.
+Automatically Extracted Lesson Pool
+[clean]: To successfully complete a task involving cleaning an object, I 
+should first locate the object, then clean it directly at the appropriate 
+location (usually like a sink).
+[put]: When putting an object in a container, I should first find and 
+take the object, then open the container before putting the object in it.
+[heat]: Systematically check all potential locations for the required 
+items, ensuring to interact with each object correctly before 
+proceeding to the next step, go to a microwave and heat with it.
+...
+Fig. 6.
+Part of the automatically extracted lesson pool by the Mentor LLM
+in our experiment. The lesson pool may contain environmental constraints
+with the significance of retention and generalization.
+D. Real-World Robotic Experiment
+We use a quadruped robot with a manipulator to validate
+the practicability of our method in the real world. The results
+indicate that the robot deployed with our FCRF performs
+better in self-reflection on a block organization task. The
+detailed process is shown in Figure 7. More details of real-
+world experiments will be shown in our website and video.
+VII. CONCLUSIONS
+To our knowledge, we are the first to study the problem of
+self-reflection flexibility and constructivism in long-horizon
+robotic task planning with LLMs. Based on the construc-
+tivist learning theory of human intelligence, we propose a
+Mentor-Actor self-reflection framework called FCRF, which
+performs self-reflection with intensity flexibility according
+to task difficulty, meanwhile integrating valuable experience
+and failure lessons. Furthermore, we design a memory man-
+agement module to efficiently manage the reflection context
+of LLMs. Experiments conducted in virtual household envi-
+ronment and the real world demonstrate that our reflection
+framework can effectively enhance the flexibility, efficiency
+and success rate of long-horizon planning tasks, making
+domestic robots more reliable and trustworthy.
+5468
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 8 ---
+Look for blue cube everywhere
+Find and catch blue cube
+Look for green cube everywhere
+Still Look for blue cube everywhere
+Look for and catch green cube first
+Directly go for blue cube and take it
+Directly go for green cube and take it
+Put the two cubes into bucket 1
+Lesson Pool: Bucket1 is for 
+equipments storage, while 
+bucket2 is used as a garbagecan
+Failed Trajectory
+Task Goal: Organize the blue 
+cube and the green cube
+Reasoning-Reflection: 
+Ineffectively swapped the 
+order of searching, still failed 
+FCRF: 
+Retained valuable 
+experience and extracted 
+lesson, succeed
+Found blue cube
+Bucket1
+Final result: 
+Exhausted permitted 
+steps
+Final result: 
+Ineffectively swapped the 
+searching order, but still 
+exhausted steps
+Final result: 
+Retained experience to 
+save steps, and precisely 
+extracted lesson
+FAIL
+FAIL
+SUCCESS
+Fig. 7.
+Comparison of reflection methods in a real-world experiment. In the block organization task, Reasoning-Reflection invalidly swaps the order of
+searching, while FCRF retains experience of object position to save action steps and extracts precise lesson for constraints, finally corrected the trajectory.
+REFERENCES
+[1] Huihui Guo, Fan Wu, Yunchuan Qin, Ruihui Li, Keqin Li, and Kenli
+Li. Recent trends in task and motion planning for robotics: A survey.
+ACM Computing Surveys, 55(13s):1–36, 2023.
+[2] Georgios A Zachiotis, George Andrikopoulos, Randy Gornez, Keisuke
+Nakamura, and George Nikolakopoulos. A survey on the application
+trends of home service robotics. In 2018 IEEE international confer-
+ence on Robotics and Biomimetics (ROBIO), pages 1999–2006. IEEE,
+2018.
+[3] Michael Ahn, Anthony Brohan, Noah Brown, Yevgen Chebotar, Omar
+Cortes, Byron David, Chelsea Finn, Chuyuan Fu, Keerthana Gopalakr-
+ishnan, Karol Hausman, et al. Do as i can, not as i say: Grounding
+language in robotic affordances.
+arXiv preprint arXiv:2204.01691,
+2022.
+[4] Shyam Sundar Kannan, Vishnunandan LN Venkatesh, and Byung-
+Cheol Min. Smart-llm: Smart multi-agent robot task planning using
+large language models. In 2024 IEEE/RSJ International Conference
+on Intelligent Robots and Systems (IROS), pages 12140–12147. IEEE,
+2024.
+[5] Zhehua Zhou, Jiayang Song, Kunpeng Yao, Zhan Shu, and Lei Ma.
+Isr-llm: Iterative self-refined large language model for long-horizon
+sequential task planning. In 2024 IEEE International Conference on
+Robotics and Automation (ICRA), pages 2081–2088. IEEE, 2024.
+[6] Weiran Yao, Shelby Heinecke, Juan Carlos Niebles, Zhiwei Liu, Yihao
+Feng, Le Xue, Rithesh Murthy, Zeyuan Chen, Jianguo Zhang, Devansh
+Arpit, et al. Retroformer: Retrospective large language agents with
+policy gradient optimization. arXiv preprint arXiv:2308.02151, 2023.
+[7] Noah
+Shinn,
+Federico
+Cassano,
+Ashwin
+Gopinath,
+Karthik
+Narasimhan, and Shunyu Yao.
+Reflexion: Language agents with
+verbal reinforcement learning.
+Advances in Neural Information
+Processing Systems, 36, 2024.
+[8] Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik
+Narasimhan, and Yuan Cao. React: Synergizing reasoning and acting
+in language models. arXiv preprint arXiv:2210.03629, 2022.
+[9] Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Tom Griffiths,
+Yuan Cao, and Karthik Narasimhan.
+Tree of thoughts: Deliberate
+problem solving with large language models.
+Advances in Neural
+Information Processing Systems, 36, 2024.
+[10] Wenqi Zhang, Ke Tang, Hai Wu, Mengna Wang, Yongliang Shen,
+Guiyang Hou, Zeqi Tan, Peng Li, Yueting Zhuang, and Weiming
+Lu.
+Agent-pro: Learning to evolve via policy-level reflection and
+optimization. arXiv preprint arXiv:2402.17574, 2024.
+[11] Andy Zhou, Kai Yan, Michal Shlapentokh-Rothman, Haohan Wang,
+and Yu-Xiong Wang.
+Language agent tree search unifies rea-
+soning acting and planning in language models.
+arXiv preprint
+arXiv:2310.04406, 2023.
+[12] Andrew Zhao, Daniel Huang, Quentin Xu, Matthieu Lin, Yong-Jin
+Liu, and Gao Huang.
+Expel: Llm agents are experiential learners.
+In Proceedings of the AAAI Conference on Artificial Intelligence,
+volume 38, pages 19632–19642, 2024.
+[13] Minghao Chen, Yihang Li, Yanting Yang, Shiyu Yu, Binbin Lin,
+and Xiaofei He.
+Automanual: Generating instruction manuals by
+llm agents via interactive environmental learning.
+arXiv preprint
+arXiv:2405.16247, 2024.
+[14] George
+E
+Hein.
+Constructivist
+learning
+theory.
+Institute
+for
+Inquiry.
+Available
+at:/http://www.
+exploratorium.
+edu/ifi/resources/constructivistlearning. htmlS, 1991.
+[15] Mohit Shridhar, Xingdi Yuan, Marc-Alexandre Cˆot´e, Yonatan Bisk,
+Adam Trischler, and Matthew Hausknecht. Alfworld: Aligning text
+and embodied environments for interactive learning. arXiv preprint
+arXiv:2010.03768, 2020.
+[16] Shuang Li, Xavier Puig, Chris Paxton, Yilun Du, Clinton Wang, Linxi
+Fan, Tao Chen, De-An Huang, Ekin Aky¨urek, Anima Anandkumar,
+et al. Pre-trained language models for interactive decision-making.
+Advances in Neural Information Processing Systems, 35:31199–31212,
+2022.
+[17] Alec Radford, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei,
+Ilya Sutskever, et al.
+Language models are unsupervised multitask
+learners. OpenAI blog, 1(8):9, 2019.
+[18] Jacky Liang, Wenlong Huang, Fei Xia, Peng Xu, Karol Hausman,
+Brian Ichter, Pete Florence, and Andy Zeng.
+Code as policies:
+Language model programs for embodied control.
+In 2023 IEEE
+International Conference on Robotics and Automation (ICRA), pages
+9493–9500. IEEE, 2023.
+[19] Ishika Singh, Valts Blukis, Arsalan Mousavian, Ankit Goyal, Danfei
+Xu, Jonathan Tremblay, Dieter Fox, Jesse Thomason, and Animesh
+Garg. Progprompt: Generating situated robot task plans using large
+language models. In 2023 IEEE International Conference on Robotics
+and Automation (ICRA), pages 11523–11530. IEEE, 2023.
+[20] Haotian Sun, Yuchen Zhuang, Lingkai Kong, Bo Dai, and Chao Zhang.
+Adaplanner: Adaptive planning from feedback with language models.
+Advances in Neural Information Processing Systems, 36, 2024.
+[21] Chan Hee Song, Jiaman Wu, Clayton Washington, Brian M Sadler,
+Wei-Lun Chao, and Yu Su. Llm-planner: Few-shot grounded planning
+for embodied agents with large language models. In Proceedings of
+the IEEE/CVF International Conference on Computer Vision, pages
+2998–3009, 2023.
+[22] Naoki Wake, Atsushi Kanehira, Kazuhiro Sasabuchi, Jun Takamatsu,
+and Katsushi Ikeuchi. Chatgpt empowered long-step robot control in
+various environments: A case application. IEEE Access, 2023.
+[23] Mikko Lauri, David Hsu, and Joni Pajarinen.
+Partially observable
+markov decision processes in robotics: A survey. IEEE Transactions
+on Robotics, 39(1):21–40, 2022.
+[24] Jiatao Zhang, Lanling Tang, Yufan Song, Qiwei Meng, Haofu Qian,
+Jun Shao, Wei Song, Shiqiang Zhu, and Jason Gu. Fltrnn: Faithful
+long-horizon task planning for robotics with large language models.
+In 2024 IEEE International Conference on Robotics and Automation
+(ICRA), pages 6680–6686. IEEE, 2024.
+[25] Qingxiu Dong, Lei Li, Damai Dai, Ce Zheng, Jingyuan Ma, Rui Li,
+Heming Xia, Jingjing Xu, Zhiyong Wu, Tianyu Liu, et al. A survey
+on in-context learning. arXiv preprint arXiv:2301.00234, 2022.
+5469
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 10:20:52 UTC from IEEE Xplore.  Restrictions apply. 

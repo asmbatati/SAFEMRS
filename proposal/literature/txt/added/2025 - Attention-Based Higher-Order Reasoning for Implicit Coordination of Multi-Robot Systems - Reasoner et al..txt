@@ -1,0 +1,933 @@
+--- Page 1 ---
+Attention-Based Higher-Order Reasoning for Implicit Coordination of
+Multi-Robot Systems
+Jonathan Reasoner, Lauren Bramblett, and Nicola Bezzo
+Abstract— This paper presents a novel theory of mind (ToM)-
+based approach for implicit coordination of multi robot systems
+(MRS) in environments where direct communication is unavail-
+able. The proposed approach integrates higher-order reasoning,
+epistemic theory, and active inference to coordinate the actions
+of each robot to clarify their own intentions and make them
+understandable to other robots. Further, to reduce the computa-
+tional overhead of higher-order reasoning, we implement a large
+language model (LLM)-based attention selection mechanism
+that focuses on a subset of robots. Simulations and physical
+experiments demonstrate the applicability of the proposed
+approach with high success rates while significantly reducing
+computation complexity.
+I. Introduction
+Autonomous multi-robot systems (MRS) promise transfor-
+mative solutions for dynamic challenges—from surveillance
+and reconnaissance [1], to search and rescue [2]. However,
+despite their potential, widespread adoption of MRS has been
+limited because of challenges associated with ensuring robust
+cooperation. This is particularly true when communication
+is constrained, unreliable, or even absent [3]. Even when
+communication is possible, excessive data exchange can
+overwhelm networks, slow decision-making, and ultimately
+lead to operational failures.
+Coordinating actions in real-time with minimal explicit
+communication is a task that humans often perform with
+remarkable ease. We can empathize to assess if others
+are aware of our intentions, and modify our behavior to
+facilitate the attainment of common goals. Humans achieve
+this by developing beliefs about others and empathy for them,
+effectively “putting themselves in another’s shoes.”
+This capability is commonly known as Theory of Mind
+(ToM) [4], and enables the formation of belief and empa-
+thy states. The logical framework which describes ToM is
+referred to as Epistemic Logic [5]. Incorporating epistemic
+logic in MRS enables coordination by allowing robots to
+infer the intentions, actions, or goals of other robots based
+on shared or observed information [6], [7]. By incorporating
+epistemic reasoning, MRS can achieve implicit coordination
+and make decisions that account for the beliefs and empathy
+states of other robots, leading to more efficient and adaptive
+problem-solving – especially in communication-restricted
+environments.
+The formation of belief and empathy states is referred to as
+higher-order reasoning which can be categorized into various
+levels [8]: Zero-order reasoning refers to robot A’s belief
+about its own state; First-order reasoning refers to robot A’s
+belief about robot B; Second-order reasoning is defined as
+Jonathan Reasoner, Lauren Bramblett, and Nicola Bezzo are with the
+Departments of Electrical and Computer Engineering and Systems and
+Information Engineering, University of Virginia, Charlottesville, VA 22904,
+USA. Email: {vqh7rx, qbr5kx, nb6be}@virginia.edu
+(a)
+(b)
+Fig. 1.
+Demonstration of the problem addressed in the paper: (a) With
+traditional planning, robots may take inefficient paths or fail to attain all
+goals; (b) with the proposed higher-order reasoning approach, robots can
+implicitly convey their intentions for more efficient task allocation.
+robot A’s belief about robot B’s belief about robot A; Third-
+order reasoning is defined as robot A’s belief about robot
+B’s belief about robot C.
+With these premises, this paper focuses on answering the
+following question: How can we implicitly coordinate multi-
+robot systems when communication between robots is not
+available?
+Let us consider the scenario shown in Fig. 1 where a team
+of robots is required to accomplish a collection of tasks,
+provided as a high-level goal (i.e., put out all fires) and
+further broken down into specific sub-goals (e.g., put out
+fire at specific locations). Each robot is provided with the
+location of the sub-goals and can observe the other robots’
+positions, but cannot communicate with any other robot.
+To accomplish the high-level task, each robot must observe
+the other robot’s actions to determine which goal it should
+work towards. Fig. 1(a) shows the results of performing
+this task with a classic reward-seeking policy (i.e., going
+to the closest goal). Zero-order reasoning leads to all robots
+initially converging to the same goal. Blue is able to sense
+that the center goal is occupied despite measurement noise
+and move to the right goal, but red and green remain
+deadlocked due to that same noisy sensor data, causing a
+failure. To improve coordination in task-goal assignments,
+robots should take actions that best signal their belief to other
+robots. By acting in a manner that increases certainty of the
+robot-goal assignments, the MRS can better converge on an
+acceptable solution. This proposed uncertainty-based higher-
+order reasoning approach can be observed in Fig. 1(b), with
+the green robot clearly showing its intent to go to the left
+goal and similarly red moving in such a way to clearly signal
+its intent of the right goal. In this way all robots are clear
+on the intent of each other and can achieve the desired end-
+state, despite the same noisy sensor measurements present in
+Fig. 1(a).
+The contributions of this paper are twofold. First, we
+address the decentralized task allocation and motion planning
+(TAMP) problem in communication-restricted environments
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2025)
+October 19-25, 2025. Hangzhou, China
+979-8-3315-4393-8/25/$31.00 ©2025 IEEE
+12428
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) | 979-8-3315-4393-8/25/$31.00 ©2025 IEEE | DOI: 10.1109/IROS60139.2025.11246158
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:54:56 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 2 ---
+for large-scale systems by introducing a novel higher-order
+active inference framework using only local observations for
+decision making. Second, rather than relying on heuristic
+or manually tuned attention selection methods, we leverage
+LLMs for dynamic and adaptive robot selection for higher-
+order reasoning, reducing computational complexity.
+II. Related Works
+TAMP has historically been addressed through centralized
+methods—such as market-based approaches [9]—or through
+decentralized coordination strategies that rely on constant
+inter-agent communication or planned rendezvous due to
+limited communication capabilities [7], [10]. However, in
+environments where communication is entirely absent, these
+methods often struggle to scale and perform effectively.
+For scenarios with communication constraints, researchers
+have explored implicit coordination strategies where robots
+leverage environmental cues rather than explicit communi-
+cation [11]. Such approaches often rely on local sensing and
+behavior-based rules, which require structured environments
+and lack the flexibility required for dynamic, communication-
+restricted settings. In [12], authors address a related problem
+but focus on the use of a finite state machine and direct
+sensory-motor cues to relay information (i.e. a “waggle-
+dance” to signal it found the goal). However, this method
+imposes a strict requirement for the agents to stay in close
+visual proximity to detect the subtle motion cues used for
+signaling, thereby limiting its utility in more expansive or
+dynamic environments.
+Rather than depending on sensorimotor cues to relay in-
+formation, another technique has been to incorporate human-
+inspired reasoning frameworks into multi-robot systems.
+Theory of mind (ToM) – the ability to infer the beliefs,
+intentions, and desires of others [4] – has been successfully
+applied in robotics using epistemic planning which logically
+models this hierarchical belief to anticipate and interpret
+the actions of cooperative robots within the system [5]. By
+endowing robots with a rudimentary form of ToM, systems
+can better predict the future behavior of peers, thereby
+compensating for a lack of direct communication [13].
+A further promising development is the application of
+active inference to robotic control and decision-making.
+Rooted in the free energy principle [14], active inference
+provides a unified framework for perception, action, and
+learning, wherein agents minimize variational free energy
+(VFE) to reduce uncertainty about their environment and
+their state. Recent works have demonstrated that active
+inference can facilitate robust behavior in uncertain and
+dynamic settings such as for control and state estimation
+of industrial manipulators and humanoid robots [15].
+Complementing these methodologies, recent advances in
+Large Language Models (LLMs) have shown that, through
+careful prompt engineering, LLMs can exhibit behaviors akin
+to Theory of Mind [16]. Most research focuses on approaches
+which use LLMs to directly determine the next best action
+[17], whereas our work leverages LLMs to identify the “most
+important” robots for focused higher-order reasoning.
+Despite significant progress in each of these areas, there
+remains a notable gap in the literature concerning the sys-
+tematic integration of theory of mind, epistemic logic, and
+active inference for addressing multi-robot task allocation
+under communication constraints. Our work seeks to bridge
+this gap by proposing a novel framework that leverages
+these principles to facilitate coordination among robots in
+environments where explicit communication is absent. Our
+approach provides a robust alternative to traditional TAMP
+methods that depend on extensive communication.
+III. Problem Formulation
+The main goal of this work is to create an estimation,
+planning, and control policy to enable implicit coordination
+between heterogeneous robotic systems with limited or absent
+communication.
+Among the many applications that fall within this problem,
+this paper focuses specifically on TAMP operations where
+each robot ri within a set R = {r1, r2, . . . , rn} is tasked to
+explore and reach a goal gj ∈G = {g1, g2, . . . , gm}, where
+m, n ∈N, without overlapping with another robot (i.e., no
+two or more robots should go to the same goal). For example,
+consider a robotic system that is tasked to cover and provide
+surveillance to all exits of a building, or during search and
+rescue operations where multiple objects of interest may be
+scattered in an environment. Without proper planning and in
+the absence of communication, some robots may interfere
+with one another and end up converging to the same goal,
+while others may deadlock, unable to decide where to go.
+Formally, this paper works on the following problem:
+Problem 1 – Implicit Coordination for Task Coverage:
+The objective of this work is to design a TAMP policy π to
+drive each robot in R in a decentralized fashion to distinct
+goals, minimizing uncertainties, confusion, and interference
+with other robots. In mathematical terms, this is equivalent
+to minimizing the expected free energy F of π over a time
+horizon T given observations y and states x [18]:
+F(π) =
+T
+X
+τ=1
+DKL[Q(y, π)||P(y)] + H[P(y|x)]
+where DKL[·] and H[·] denote the Kullback-Leibler diver-
+gence and Shannon entropy, respectively. The first term
+represents the divergence between a predicted outcome distri-
+bution Q(y, π) and a desired outcome distribution P(y). The
+second term seeks to minimize the risk of uncertain future
+outcomes (also known as epistemic risk) given the current
+state.
+To solve this problem, we propose: i) a higher-order
+reasoning framework using epistemic theory, and ii) an
+active inference method that enables each robot to choose
+movements that can clarify their own intentions and make
+them easily understandable to the other robots (sensory-
+motor communication). Because computational complexity
+increases exponentially as more robots and tasks are added, a
+secondary problem we propose to solve here is how to select
+a proper subset of robots to perform higher-order reasoning.
+IV. Approach
+Our proposed technical approach to solving this decen-
+tralized cooperative TAMP problem in the absence of direct
+communication involves framing the problem as a bi-level
+resource optimization problem. The upper-level problem
+handles the strategic selection of tasks from a known set,
+12429
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:54:56 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 3 ---
+while the lower-level problem optimally assigns robots to
+selected tasks. The optimization problem is formulated as:
+min
+ρ,σ
+m
+X
+j=1
+c j ρj +
+n
+X
+i=1
+m
+X
+j=1
+c′
+ij σij
+(1)
+subject to
+m
+X
+j=1
+ρj ≤K,
+(2)
+ρj ∈{0, 1}
+∀j ∈{1, . . . , m},
+(3)
+σij = arg min
+σ′
+ij
+n
+X
+i=1
+m
+X
+j=1
+bij σ′
+ij.
+(4)
+where ρj is a binary variable indicating whether task j
+has been selected (with associated cost c j); σij is a binary
+assignment variable denoting whether robot i is allocated to
+task j (with cost c′
+ij), bij is the cost of assigning robot i to
+task j, and K is the maximum number of tasks that can be
+selected from the set G.
+In this formulation, the upper-level objective (1) minimizes
+the total cost of task selection and robot assignment, subject
+to the constraint (2) in which no more than K tasks are
+selected from set G. The lower-level problem (4) determines
+the optimal robot-task assignments by minimizing the asso-
+ciated costs.
+By embedding this bi-level optimization framework within
+our decentralized decision-making architecture, each robot
+can execute actions that both drive it toward its own goal
+and clarify its intent to others. Each robot can reason about
+what the other robots are likely to believe by simulating
+observations from the other robot’s perspectives.
+We address this bi-level resource optimization problem by
+following the strategy depicted in Fig. 2 in which each robot
+first collects observations according to:
+yi(t) = oi(x1:n(t), si) + ζi(t),
+(5)
+where oi(·) is the observation mapping function for each of
+the n-robots, x j = (x, y, θ)′ is the state of another robot
+j, si denotes the sensor configuration of robot i, and the
+measurement noise ζi(t) ∼N 0, Γi
+. This function converts
+the pose data into robot observational data by accounting
+for sensor capabilities. These observations are then mapped
+to evidence values where they are leveraged by an active
+inference approach to select actions that minimize variational
+free energy (VFE) and reduce uncertainty. In other words,
+this minimization picks actions that clearly signal the robot’s
+intended goal. Finally, an LLM-based attention selection
+method is proposed to decrease computational complexity
+by limiting higher-order reasoning onto a subset of robots
+within the system.
+Fig. 2.
+Overview of the proposed attentive active epistemic planning
+framework.
+A. Epistemic Evidence Collection
+Traditionally, robots use zero- or first-order reasoning
+to understand their team by collecting observations and
+employing heuristics to determine the objectives or tasks
+of other team members [19]. In this paper, we employ
+higher-order reasoning to infer the perspectives of other
+robots along with a robot’s zero- and first-order observations
+while disconnected. To model this perspective shift, a robot
+translates its own locally collected observations yi(t) into
+evidence values via a mapping function:
+ei ←υi(yi, si,G).
+(6)
+The function υi processes the observation data yi, using robot
+i’s sensor type, si, and the set of goals G. This produces
+an evidence matrix ei ∈Rm×n where each element of ei
+quantifies the probability that robot j is selecting a particular
+goal g ∈G based on current sensor data.
+The evidence matrix varies based on the sensing capabil-
+ities of the robot that gathers the observations. Specifically,
+the mapping function υi(·) for robot ri takes as input the poses
+(x, y, θ) of all robots and overlays their sensor capabilities.
+This enables robot ri to infer what information another robot
+rj might be collecting and the resulting evidence matrix e j.
+For example, if r j is equipped with a LiDAR, then ri assumes
+that rj can measure both distances and angles. Conversely,
+if r j has a camera with a limited field of view, ri infers that
+rj can measure only angles.
+Given a vector of robot-goal assignments G in which each
+column represents a robot and each entry an assigned goal,
+by using the evidence matrix in (6), we can construct a joint
+probability matrix for each robot:
+PJ
+i,k(Gk
+i ) =
+n
+Y
+j=1
+ei( j, Gk
+i ( j)) ∀k = 1, · · · , nn.
+(7)
+For example: PJ
+i,1(g3, g2, g1) where m = n = 3, can be
+interpreted as “given G1
+i = (g3, g2, g1), robot i’s evidence
+that robot 1 is selecting g3 as its goal, robot 2 is selecting g2
+and robot 3 is selecting g1”. With this constructed, the robot
+then extracts the probabilities for only the valid robot-goal
+assignments, according to (2), resulting in a vector denoted as
+hi, j(yi, S,G) where j denotes the robot that ri is empathizing
+with. Thus, each value within the vector represents ri’s belief
+of rj’s belief that goal configuration Gk
+i is the robot-goal
+assignment set that the system is converging to.
+To perform higher-order reasoning, robot i repeats this
+process from the perspective of every other robot in the
+system, replacing si with the sensor type of the robot that
+it is empathizing with from the list, S . This nested structure
+encapsulates the idea that robot i reasons not only about its
+own observations but also about what it infers other robots
+observe and believe. Because the observations from different
+robots’ perspectives are independent, they can be aggregated
+into a combined state belief vector hi(yi, S,G) via:
+hi(yi, S,G) =
+n
+X
+j=1
+h
+hi, j(yi, S,G)
+i
+.
+(8)
+The most likely goal configuration is then determined by
+taking the argmax over hi:
+G∗
+i = arg max
+G
+hi.
+(9)
+12430
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:54:56 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 4 ---
+This goal set G∗
+i represents robot i’s belief of the most likely
+robot-to-goal assignments and, therefore, the solution which
+it believes the system is converging to.
+B. Active Inference
+The obtained robot i’s belief of the most likely robot-
+goal assignments, G∗
+i , is then used in the active inference
+framework for Bayesian belief updating:
+˜Q(G∗
+i | hi(t)) ∝P(hi(t) | G∗
+i ) P(G∗
+i ).
+(10)
+Here,
+˜Q(·) represents the posterior belief over the goal
+configuration G∗
+i , given the robot’s epistemic belief hi(t). The
+term P(hi(t) | G∗
+i ) denotes the likelihood of the observations
+under the assumption that G∗
+i is the true goal configuration,
+while P(G∗
+i ) represents the prior belief about G∗
+i before
+incorporating the new observations. This Bayesian update
+accounts for the uncertainty in the true system state by
+continuously refining the robot’s belief as new data are
+collected.
+Each robot uses (10) to estimate the resulting posterior if
+it was to take each of the possible actions within the discrete
+action space. This array of posterior values is then used to
+calculate the variational free energy (VFE). The VFE serves
+as a measure of the discrepancy between the robot’s predicted
+observations and the actual observations:
+F  xi(t), ui(t), G, hi(t), si
+ =
+DKL
+h ˜Q(G∗
+i ) ∥P(G∗
+i )
+i
++ H
+h ˜Q(G∗
+i )
+i
++ α J(dixi),
+(11)
+where the first term on the right-hand side represents the KL
+divergence:
+DKL(P ∥˜Q) =
+X
+x
+P(G∗
+i ) log
+P(G∗
+i )
+˜Q(G∗
+i ) + ϵ ,
+(12)
+that measures the similarity between the prior belief, P(G∗
+i )
+and the posterior belief, ˜Q(G∗
+i ) of G∗
+i , with a small ϵ added
+for stability around zero.
+The second term is the Shannon entropy:
+H( ˜Q(G∗
+i )) = −
+X
+a∈A
+˜Q(G∗
+i ) log ˜Q(G∗
+i ).
+(13)
+which captures the uncertainty in the posterior. The third
+term is included for scenarios where multiple actions result
+in near identical VFE values, which occurs in environments
+with high symmetry and can lead to a robot oscillating
+between actions. This J(·) term inversely relates each discrete
+action to the distance gained toward gi, driving robot i toward
+the goal associated with the ith term in G∗
+i . The scaling factor,
+α, is tuned to ensure its contribution is significant only when
+the VFE values are nearly identical.
+With the VFE calculated for each possible action that the
+robot can take, each robot chooses its next action as the one
+that results in the minimum resulting VFE:
+u∗
+i = arg min
+ui(t)∈U
+F  xi(t), ui(t), G∗
+i , yi(t), si
+ .
+(14)
+Minimizing the VFE leads robots to behave in more pre-
+dictable ways, making it easier for other robots to infer
+their intentions at the expense of sacrificing shortest dis-
+tance/minimum energy solutions.
+C. LLM-Based Attention Selection
+The computational complexity of active inference with
+epistemic planning scales exponentially with the number of
+robots within a system. Human decision-making, however,
+rarely involves reasoning about every individual in an envi-
+ronment; instead, attention is allocated selectively. To mimic
+this process, we implement an attention selection mechanism
+that restricts higher-order reasoning for robot i to a subset
+of robots, ˆRi ∈R with dimension ˆn < n.
+Large Language Models (LLMs) have demonstrated an
+impressive ability to integrate and reason over complex,
+holistic information, thereby enhancing decision-making pro-
+cesses [20]. Leveraging this strength, we integrate an LLM
+into our framework to dynamically identify and select the
+subset of robots that contribute most significantly to overall
+system uncertainty.
+In our implementation, each robot collects its local ob-
+servations, yi(t), a list of other robots’ sensor capabilities
+S , sample VFE calculations, and the evidence matrix, ei
+computed via (6). This aggregated information is then sent to
+the LLM API as a part of a few-shot prompt with instructions
+on what the robot should consider when making the decision
+regarding which robots are the most important to focus on.
+Based on this input, the LLM outputs a prioritized list of
+robots, ˆRi, for robot i to focus its higher-order reasoning
+exclusively on.
+As a result of this attention selection method, computation
+is reduced because the dimension of the joint probabil-
+ity matrix, used in (8), is reduced from Rnn to Rˆnˆn. The
+subset selection also reduces the number of valid robot-
+goal assignments from n! to
+n!
+(n−ˆn)!, significantly decreasing
+computational demands as ˆn decreases.
+V. Simulations
+Our simulations compare five approaches to evaluate the
+performance of our higher-order active inference framework
+for decentralized TAMP operations: i) a greedy method [21],
+ii) first-order reasoning [22], iii) full higher-order reason-
+ing (where one robot reasons about all other robots), iv)
+proximity-based higher-order reasoning (where one robot
+reasons about its closest ν robots), and v) LLM-selected
+higher-order reasoning (where one robot reasons about ν
+robots chosen by an LLM). A simulation is deemed success-
+ful if the system converges to a valid goal configuration G
+within 100 iterations with each iteration duration dt = 0.5s.
+The specific number of iterations was chosen such that in
+each simulation every robot has the time to reach any point
+within the map before the simulation ends, including a 20%
+margin of error.
+A. Simulation Configuration and Parameters
+Robot Parameters: Each robot is modeled as a differential-
+drive system with discrete control inputs, having a maximum
+linear velocity of 1m/s and a maximum angular velocity of
+π/4rad/s. The dynamics of each robot i ∈R is described by
+˙xi(t) = fi(xi(t), ui(t)) + λi(t)
+=
+
+0
+0
+−v sin θ
+0
+0
+v cos θ
+0
+0
+0
+
+
+xi(t)
+yi(t)
+θi(t)
++
+
+cos θ
+0
+sin θ
+0
+0
+1
+
+"
+vi(t)
+ωi(t)
+#
++ λi(t)
+(15)
+12431
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:54:56 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 5 ---
+(a) Full higher-order (HO) reasoning
+(b) LLM selected HO reasoning
+(c) Proximity based HO reasoning
+Fig. 3.
+A 4-robot demonstration of our approach. Snapshots of the paths are taken at key points in the simulation with results showing that: (a) higher-order
+reasoning allows robots to better understand each others and converge to distinct goals with no confusion; (b) by leveraging LLM to assist in determining
+which robots to focus on we achieve results comparable to full higher-order reasoning while reducing runtime; and (c) proximity selection may lead to
+confusion in goal assignment.
+where xi(t) ∈Rd is the state, consisting of a robot’s position
+(x and y) and heading, θ. ui(t) ∈Ui is the discrete control
+input consisting of the linear and angular velocity (vi and ωi,
+respectively), and λi ∼N 0, Γi
+.
+Two types of robots are included in our MRS to achieve
+heterogeneity: type-A, a robot equipped with a LiDAR that
+can obtain both distance and angular differences between
+robots, and type-B, a robot with a camera sensor that can only
+measure the angular differences between robots and goals.
+Environment Parameters: The simulation environment
+consists of a 30m × 30m, obstacle-free world. MRS compris-
+ing of 4, 5, 6, and 7 robots, each paired with an equal number
+of goals, were evaluated with goals, initial robot locations,
+and robot types created randomly. Expanding the system
+beyond 7 robots introduces a computational burden that
+exceeds practical runtimes for the full higher-order reasoning
+system, making result comparisons infeasible.
+LLM Parameters: For this paper, OpenAI’s ChatGPT-3.5
+Turbo and Meta’s Llama 3 were evaluated without additional
+fine-tuning. Each robot was able to query an LLM model
+via API. However, due to query limits on Llama 3, only
+OpenAI’s solution was found to be practical. To improve
+execution speed, the LLM was invoked once every 15
+iterations to select the “most important” robots for higher-
+order reasoning. On average, the query time was found to be
+0.1s, but could vary based on internet latency.
+B. Results
+We performed 1,826 simulations, with Fig. 3 showing
+typical results used to compare our method to the baselines.
+Fig. 3(a) shows the results of using higher-order reasoning on
+all robots. This approach achieves implicit coordination and
+allows for efficient convergence to a solution with each robot
+acting in a way that clearly shows their intention to other
+robots. In Fig. 3(b), an LLM is used to select the robot that is
+deemed “most important” to perform higher-order reasoning
+based on the approach outlined in Sec. IV-C. By leveraging
+full contextual information, the system selects a subset of
+robots that allows it to converge to a solution similar to the
+one in Fig. 3(a), but with a 57.3% reduction in runtime per
+iteration versus the full higher-order solution.
+As a basis of comparison, another method evaluated was
+to select ˆRi based on the shortest Euclidean distance to ri.
+This naive approach evaluates the hypothesis that often local
+interactions are the most critical for coordination, inspired
+by the interactions within schools of fish and flocks of birds.
+Fig. 3(c) shows the results when higher-order reasoning is
+only being performed on the closest robot to each other robot.
+This results in the purple robot being unable to converge on
+a goal due to changing uncertainties regarding the robot-goal
+assignments. Thus, these results demonstrate that picking the
+closest agents to perform higher-order reasoning may not be
+always the best policy since there may exist complex inter-
+actions between agents, which an LLM is able to capture.
+Fig. 4 illustrates the success rates of our approach com-
+pared to several baselines. The first x-axis row shows
+the number of robots on which higher-order reasoning is
+performed, ˆn, while the second x-axis row represents the
+total number of robots in the system, n. Full higher-order
+reasoning and both the proximity- and LLM-based atten-
+tion selection approaches are compared against the baseline
+greedy method (in which each robot selects the closest goal)
+and the first-order reasoning method (in which each robot
+predicts goals expected to be selected by others without
+explicitly signaling its intentions). As can be noted, solv-
+ing TAMP operations in heterogeneous, decentralized, non-
+communicative systems, with noisy sensor measurements is
+challenging without higher-order reasoning. When compared
+to greedy and first-order approaches, utilizing higher-order
+reasoning to minimize uncertainty increases success rates
+between 13% and 34%.
+Fig. 4.
+Success rates of various methods based on system size and the
+number of robots that higher-order reasoning is being performed on.
+Table I shows the success rate of different size MRS
+under different planning methods. By leveraging higher-
+12432
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:54:56 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 6 ---
+TABLE I
+Success Rate (%) of Different Reasoning Methods for Varying Total Robots (4, 5, 6, 7) and Number of Robots Used for Higher-Order Reasoning
+4
+5
+6
+7
+Method
+1
+2
+1
+2
+3
+1
+2
+3
+4
+1
+2
+3
+4
+5
+Greedy
+0%
+0%
+0%
+0%
+1st Order Reasoning
+32%
+12%
+10%
+8%
+Full Higher-Order Reasoning
+59%
+46%
+36%
+21%
+Proximity Based HO Reasoning
+24%
+40%
+9%
+31%
+43%
+10%
+25%
+30%
+35%
+3%
+10%
+23%
+18%
+31%
+LLM Based HO Reasoning
+20%
+48%
+13%
+31%
+41%
+9%
+13%
+24%
+38%
+3%
+3%
+10%
+14%
+36%
+order reasoning to take into account both what robot i
+believes (first-order reasoning) and what robot i believes
+other robots believe (second and third-order reasoning), robot
+i can improve the system’s ability to converge on a solution
+and decrease failure rates. The effectiveness of leveraging
+this additional information and acting to decrease uncertainty
+in the system is highlighted when comparing the success
+rate of the first-order reasoning to performing higher-order
+reasoning on just two robots. Regardless of the method for
+selecting the robots (i.e., through proximity- or LLM-based
+methods) an increase in success rate was observed over first-
+order reasoning in seven of the eight cases. In complex
+scenarios (e.g., six or seven robots), our LLM-based subset
+selection was shown to outperform the simpler proximity-
+based methods. Specifically, we found 96 simulations where
+the proximity-based approach failed while the LLM approach
+succeeded. These findings highlight the benefit of leveraging
+richer contextual cues when determining which other robots
+to perform higher-order reasoning on. We believe that the
+increase in success rates of the LLM attention selection
+method over the full higher-order reasoning method stems
+from a robot’s difficulty in consistently conveying its in-
+tentions to many other robots. By decreasing the number
+of robots that the robot i is focused on, robot i can better
+decrease uncertainties for that limited group, ˆRi.
+Fig. 5 highlights how the runtime increases as the number
+of robots grows and how selecting a subset of robots for
+higher-order reasoning achieves significant computational
+cost improvements. In 6- and 7-robot systems, by performing
+higher-order reasoning on just one fewer robot in the system,
+runtime per iteration decreased by 36.3% and 72.1% respec-
+tively when compared to full higher-order reasoning. These
+improvements scale exponentially as the MRS size grows.
+Fig. 5.
+A runtime comparison of different methods. As system size
+increases, performing higher-order reasoning on a subset of robots results
+in drastically reduced runtimes, enabling scaling of higher-order based
+reasoning systems.
+Overall, the results demonstrate that higher-order reason-
+ing enhances success rates in decentralized, communication-
+free TAMP problems, and attention selection, particularly
+using LLM technologies, maintains these benefits while sub-
+stantially reducing the computational burden.
+VI. Experiments
+The proposed approach was validated by implementing
+the attention-based active epistemic planning framework on
+a team of Clearpath-Robotics Turtlebot4 robots. Experiments
+were carried out using teams of 3–7 robots inside an
+obstacle-free 5m × 4.5m space. Positioning was achieved
+using a Vicon motion capture system with N(0, 0.05) noise
+added to the measurements to better represent real-world
+conditions. Teams comprised type-A and type-B robots
+(Sec. V-A), with linear speeds [0–0.2 m/s] (∆≈0.05) and
+angular speeds [–0.4–0.4 rad/s] (∆≈0.133).
+In Fig. 1, a 3-robot MRS is implemented. Using our
+approach (Fig. 1(b)), each robot moves in ways to minimize
+uncertainties, following (14) to make their intention clear
+to the other robots while simultaneously making progress
+toward the goal. This assures completion of the TAMP
+operation. In contrast, Fig. 1(a) shows how a reward-seeking
+policy fails due to each robot going to its closest goal while
+not considering other robots beliefs.
+Fig. 6 shows the results of an experiment conducted on a
+7-robot system. Similarly to Fig. 1, in this experiment, the
+greedy method fails due to measurement noise, as illustrated
+in Fig. 6(c) and supported by the corresponding Vicon
+data in Fig. 6(f). Sensor noise creates uncertainty about
+the availability of the goal, causing the robots to oscillate
+between targets. This failure, however, highlights the ro-
+bustness of our approach: as demonstrated in Fig. 6(a), our
+method enables robots to efficiently solve TAMP problems
+through higher-order reasoning that is less susceptible to
+noisy measurements.
+By leveraging an LLM to select a subset of robots—as
+shown in Fig. 6(b)—we achieve comparable results to full
+higher-order reasoning and obtain smooth motion with a 16%
+reduction in completion time thanks to 78.1% decrease in
+computational time per iteration.
+VII. Conclusion
+Our work demonstrates that integrating higher-order rea-
+soning with epistemic logic and active inference achieves
+effective implicit coordination in decentralized MRS. Simu-
+lation and experimental results reveal that full higher-order
+reasoning significantly improves TAMP success rates, while
+our attention selection mechanism, especially the LLM-based
+approach, substantially reduces computational overhead and
+even improves success rates in large systems.
+12433
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:54:56 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 7 ---
+(a) Full HO reasoning
+(b) LLM-selected HO reasoning
+(c) Greedy baseline
+(d) Position Data: Full HO reasoning
+(e) Position Data: LLM-selected HO reasoning
+(f) Position Data: Greedy baseline
+Fig. 6.
+Experiment results of a MRS consisting of 7 robots. In 6(a) robots are able to converge to a solution, as is the case in 6(b) when a subset of robots
+to perform higher-order reasoning on is selected. In 6(c), the greedy baseline fails due to converge due to its susceptibility to the noisy measurements.
+Figs. 6(d), 6(e), and 6(f) show the associated Vicon positional data of the experiments.
+Future work aims to improve LLM integration through
+fine-tuning and feedback mechanisms to further improve
+performance. Additionally, we aim to move from known to
+unknown environments, incorporate limited sensor ranges,
+and explore more complex environments with static and
+dynamic obstacles. Additionally, we plan to extend this
+research to adversarial operations where an MRS is working
+against another robot or MRS. This will extend our approach
+to a wider range of real-world multi-robot applications.
+VIII. Acknowledgment
+This work is based on research sponsored by Northrop
+Grumman through the University Basic Research Program.
+References
+[1] E. Olson, J. Strom, R. Morton, and A. e. a. Richardson, “Progress
+toward multi-robot reconnaissance and the magic 2010 competition,”
+Speical Issue on Multi Autonomous Ground-robotic International
+Challenge (MAGIC), vol. 29, pp. 762–792, 2012.
+[2] P. Ghassemi, D. DePauw, and S. Chowdhury, “Decentralized dynamic
+task allocation in swarm robotic systems for disaster response: Ex-
+tended abstract,” in 2019 Int’l Symposium on Multi-Robot and Multi-
+Agent Systems (MRS), 2019, pp. 83–85.
+[3] M. Dias, R. Zlot, N. Kalra, and A. Stentz, “Market-based multirobot
+coordination: A survey and analysis,” Proceedings of the IEEE, vol. 94,
+no. 7, pp. 1257–1270, 2006.
+[4] D. Premack and G. Woodruff, “Does the chimpanzee have theory of
+mind?” The Behavioral and Brain Sciences, vol. 4, pp. 515–526, 1978.
+[5] T. Bolander, T. Charrier, S. Pinchinat, and F. Schwarzentruber, “Del-
+based epistemic planning: Decidability and complexity,” Artificial
+Intelligence, vol. 287, p. 103304, 2020.
+[6] L. Bramblett and N. Bezzo, “Epistemic planning for multi-robot sys-
+tems in communication-restricted environments,” Frontiers in Robotics
+and AI, vol. 10, 2023.
+[7] L. Bramblett, R. Peddi, and N. Bezzo, “Coordinated multi-agent
+exploration, rendezvous, & task allocation in unknown environments
+with limited connectivity,” in 2022 IEEE/RSJ International Conference
+on Intelligent Robots and Systems (IROS), 2022, pp. 12 706–12 712.
+[8] A. Valle, D. Massaro, I. Castelli, and A. Marchetti, “Theory of mind
+development in adolescence and early adulthood: The growing com-
+plexity of recursive thinking ability,” Europe’s journal of psychology,
+vol. 11, no. 1, p. 112, 2015.
+[9] F. Quinton, C. Grand, and C. Lesire, “Market approaches to the multi-
+robot task allocation problem: a survey,” Journal of Intelligent &
+Robotic Systems, vol. 107, p. 29, 2023.
+[10] X. Zhu, F. Vanegas, F. Gonzalez, and C. Sanderson, “A multi-
+uav system for exploration and target finding in cluttered and gps-
+denied environments,” in 2021 International Conference on Unmanned
+Aircraft Systems (ICUAS), 2021, pp. 721–729.
+[11] F. Berlinger, M. Gauci, and R. Nagpal, “Implicit coordination for
+3d underwater collective behaviors in a fish-inspired robot swarm,”
+Science Robotics, vol. 6, no. 50, pp. 1–14, 2021.
+[12] Y. Li, Y. Gao, S. Yang, and Q. Quan, “Swarm robotics search and res-
+cue: A bee-inspired swarm cooperation approach without information
+exchange,” in 2023 IEEE International Conference on Robotics and
+Automation (ICRA), 2023, pp. 1127–1133.
+[13] T. Engesser, T. Bolander, R. Mattm¨uller, and B. Nebel, “Cooperative
+epistemic multi-agent planning for implicit coordination,” Electronic
+Proceedings in Theoretical Computer Science, vol. 243, p. 75–90, Mar.
+2017.
+[14] K. Friston, “The free-energy principle: a unified brain theory?” Nature
+Reviews Neuroscience, vol. 11, pp. 127–138, 2010.
+[15] P. Lanillos, C. Meo, C. Pezzato, A. A. Meera, M. Baioumy, W. Ohata,
+A. Tschantz, B. Millidge, M. Wisse, C. L. Buckley, and J. Tani, “Active
+inference in robotics and artificial agents: Survey and challenges,”
+CoRR, vol. abs/2112.01871, 2021.
+[16] P. Zhou, A. Madaan, Srividya, P. Potharaju, and et al., “How far are
+large language models from agents with theory-of-mind?” Google,
+Google Deepmind, 2023.
+[17] Y. Chen, J. Arkin, Y. Zhang, N. Roy, and C. Fan, “Scalable multi-robot
+collaboration with large language models: Centralized or decentralized
+systems?” in 2024 IEEE International Conference on Robotics and
+Automation (ICRA), 2024, pp. 4311–4317.
+[18] Z. Zhang and F. Xu, “An overview of the free energy principle and
+related research,” Neural Computation, vol. 36, no. 5, pp. 963–1021,
+2024.
+[19] K. Friston, T. FitzGerald, F. Rigoli, P. Schwartenbeck, J. O’Doherty,
+and G. Pezzulo, “Active inference and learning,” Neuroscience &
+Biobehavioral Reviews, vol. 68, pp. 862–879, 2016.
+[20] Y. Zhu, J. R. A. Moniz, S. Bhargava, J. Lu, D. Piraviperumal, S. Li,
+Y. Zhang, H. Yu, and B.-H. Tseng, “Can large language models
+understand context?” 2024.
+[21] G. Gutin, A. Yeo, and A. Zverovich, “Traveling salesman should not
+be greedy: domination analysis of greedy-type heuristics for the tsp,”
+Discrete Applied Mathematics, vol. 117, no. 1-3, pp. 81–86, 2002.
+[22] D. Maisto, F. Donnarumma, and G. Pezzulo, “Interactive inference:
+a multi-agent model of cooperative joint actions,” IEEE Transactions
+on Systems, Man, and Cybernetics: Systems, 2023.
+12434
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:54:56 UTC from IEEE Xplore.  Restrictions apply. 

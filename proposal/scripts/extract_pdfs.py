@@ -41,23 +41,33 @@ def extract_text(pdf_path: Path) -> str:
     return "\n\n".join(pages)
 
 
+import argparse
+
 def main() -> None:
-    if not PDF_DIR.exists():
-        sys.exit(f"ERROR: PDF directory not found: {PDF_DIR}")
+    parser = argparse.ArgumentParser(description="Extract text from PDFs.")
+    parser.add_argument("input_dir", type=Path, nargs="?", default=PDF_DIR, help="Directory containing PDF files")
+    parser.add_argument("output_dir", type=Path, nargs="?", default=TXT_DIR, help="Directory to save TXT files")
+    args = parser.parse_args()
 
-    TXT_DIR.mkdir(parents=True, exist_ok=True)
+    input_dir = args.input_dir
+    output_dir = args.output_dir
 
-    pdf_files = sorted(PDF_DIR.glob("*.pdf"))
+    if not input_dir.exists():
+        sys.exit(f"ERROR: PDF directory not found: {input_dir}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    pdf_files = sorted(input_dir.glob("*.pdf"))
     if not pdf_files:
         sys.exit(f"No PDF files found in {PDF_DIR}")
 
-    print(f"Found {len(pdf_files)} PDF(s) in {PDF_DIR}\n")
+    print(f"Found {len(pdf_files)} PDF(s) in {input_dir}\n")
 
     success, failed = 0, 0
 
     for pdf_path in pdf_files:
         txt_name = pdf_path.stem + ".txt"
-        txt_path = TXT_DIR / txt_name
+        txt_path = output_dir / txt_name
 
         try:
             text = extract_text(pdf_path)

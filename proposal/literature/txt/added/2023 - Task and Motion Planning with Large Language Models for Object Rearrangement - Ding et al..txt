@@ -1,0 +1,828 @@
+--- Page 1 ---
+Task and Motion Planning with Large Language Models
+for Object Rearrangement
+Yan Ding1∗, Xiaohan Zhang1∗, Chris Paxton2, Shiqi Zhang1
+Abstract— Multi-object rearrangement is a crucial skill for
+service robots, and commonsense reasoning is frequently needed
+in this process. However, achieving commonsense arrangements
+requires knowledge about objects, which is hard to transfer to
+robots. Large language models (LLMs) are one potential source
+of this knowledge, but they do not naively capture information
+about plausible physical arrangements of the world. We propose
+LLM-GROP, which uses prompting to extract commonsense
+knowledge about semantically valid object configurations from
+an LLM and instantiates them with a task and motion planner
+in order to generalize to varying scene geometry. LLM-GROP
+allows us to go from natural-language commands to human-
+aligned object rearrangement in varied environments. Based
+on human evaluations, our approach achieves the highest
+rating while outperforming competitive baselines in terms of
+success rate while maintaining comparable cumulative action
+costs. Finally, we demonstrate a practical implementation of
+LLM-GROP on a mobile manipulator in real-world scenarios.
+Supplementary materials are available at: https://sites.
+google.com/view/llm-grop
+I. INTRODUCTION
+Multi-object rearrangement is a critical skill for service
+robots to complete everyday tasks, such as setting tables,
+organizing bookshelves, and loading dishwashers [1], [2].
+These tasks demand robots exhibit both manipulation and
+navigation capabilities. For example, a robot tasked with
+setting a dinner table might need to retrieve tableware objects
+like a fork or a knife from different locations and place them
+onto a table surrounded by chairs, as shown in Fig. 1. To
+complete the task, the robot needs to correctly position the
+tableware objects in semantically meaningful configurations
+(e.g., a fork is typically on the left of a knife) and efficiently
+navigate indoors while avoiding obstacles like chairs or
+humans whose locations are unknown in advance.
+A variety of mobile manipulation systems have been
+developed for object rearrangement tasks [3]–[10]. Most of
+those systems require explicit instructions, such as arranging
+similar colored items in a line or placing them in a specific
+shape on a table [3], [6], [7], [9]–[11]. However, user requests
+in the real world tend to be underspecified: there can be many
+different ways to set a table that are not equally preferred.
+How does a robot figure out a fork should be placed on
+the left of a plate and a knife on the right? Considerable
+commonsense knowledge is needed. Recent results have
+shown large language models (LLMs) like GPT3 [12] and
+ChatGPT [13] capture a great deal of this common sense
+∗Equal Contribution
+1 Department of Computer Science, The State University of New York at
+Binghamton {yding25; xzhan244; zhangs}@binghamton.edu
+2 Meta AI cpaxton@meta.com
+Seat To Be Served
+Chair Obstacle
+(a)
+(b)
+(c)
+(d)
+(e)
+Computed object configurations 
+from LLM
+Fig. 1: A mobile manipulator is assigned the task of setting a table in a
+dining domain. The manipulator needs to arrange several tableware objects,
+including a knife, a fork, a plate, a cup mat, and a mug. These objects are
+available on the other tables, and there are also randomly generated obstacles
+(i.e., the red chair) that are not included in the pre-built map beforehand.
+The robot needs to compute feasible and efficient plans for rearranging the
+objects on the target table using both navigation and manipulation behaviors.
+knowledge [14]. In the past, researchers have equipped mo-
+bile manipulators with semantic information using machine
+learning methods [4], [5], [15], [16]. Those methods require
+collecting training data, which limits their applicability to
+robots working on complex service tasks.
+To equip robot planning methods with common sense for
+object rearrangement, we introduce LLM-GROP, standing
+for Large Language Model for Grounded RObot Task and
+Motion Planning, our approach that leverages commonsense
+knowledge for planning to complete object rearrangement
+tasks. LLM-GROP first uses an LLM to generate symbolic
+spatial relationships between objects, e.g., a fork and a knife
+are placed on the left and right respectively. The spatial
+relationships then can be grounded to different geometric
+spatial relationships whose feasibility levels are evaluated by
+a motion planning system, e.g., placing objects in some areas
+of a table can be easier than the others. Finally, the feasibility
+and efficiency of different task-motion plans are optimized
+towards maximizing long-term utility, i.e., seeking the best
+trade-off between motion feasibility and task-completion
+efficiency.
+2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)
+October 1-5, 2023. Detroit, USA
+978-1-6654-9190-7/23/$31.00 ©2023 IEEE
+2086
+2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) | 978-1-6654-9190-7/23/$31.00 ©2023 IEEE | DOI: 10.1109/IROS55552.2023.10342169
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:59:11 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 2 ---
+We have applied LLM-GROP to a dining room, where a
+mobile manipulator must set a table according to a user’s
+instructions. A set of tableware objects are provided to the
+robot, where the robot’s task is to compute a tabletop config-
+uration of those objects that comply with common sense, and
+compute a task-motion plan to realize the configuration. To
+evaluate the performance of our approach, we had users rate
+different place settings to get a subjective evaluation. We ob-
+served improvements in user satisfaction from LLM-GROP
+compared with existing object rearrangement methods, while
+maintaining similar or lower cumulative action costs. Finally,
+LLM-GROP was demonstrated on a real robot.
+II. RELATED WORK
+We first introduce the object rearrangement domain, then
+discuss methods for tabletop object arrangement that mostly
+rely on supervised learning methods, and finally summarize
+research on using large language models for planning.
+A. Object Rearrangement
+Rearranging objects is a critical task for service robots,
+and much research has focused on moving objects from
+one location to another and placing them in a new position.
+Examples include the Habitat Rearrangement Challenge [1]
+and the AI2-THOR Rearrangement Challenge [2]. There is
+rich literature on object rearrangement in robotics [3], [6],
+[7], [9]–[11], [17]. A common assumption in those methods
+is that a goal arrangement is part of the input, and the robot
+knows the exact desired positions of objects. ALFRED [18]
+proposed a language-based multi-step object rearrangement
+task, for which a number of solutions have been proposed
+that combine high-level skills [19], [20], and which have
+recently been extended to use LLMs as input [21]. How-
+ever, these operate at a very coarse, discrete level, instead
+of making motion-level and placement decisions, and thus
+can’t make granular decisions about common-sense object
+arrangements.
+By contrast, our work accepts underspecified instructions
+from humans, such as setting a dinner table with a few
+provided tableware objects. LLM-GROP has the capability
+to do common sense object rearrangement by extracting
+knowledge from LLMs, and operates both on a high level
+and on making motion-level placement decisions.
+B. Predicting Complex Object Arrangements
+Object arrangement is a task that involves arranging items
+on a tabletop to achieve a specific functional, semantically
+valid goal configuration. This task requires not only the
+calculation of object positions but also adherence to common
+sense, such as placing forks to the left and knives to the
+right when setting a table. Previous studies in this area, such
+as [4], [5], [15], [22], focused on predicting complex object
+arrangements based on vague instructions. For instance,
+StructFormer [23] is a transformer-based neural network
+for arranging objects into semantically meaningful structures
+based on natural-language instructions. By comparison, our
+approach LLM-GROP utilizes an LLM for commonsense
+acquisition to avoid the need of demonstration data for
+computing object positions. Additionally, we optimize the
+feasibility and efficiency of plans for placing tableware
+objects.
+There is recent research for predicting complex object
+arrangement using web-scale diffusion models [22]. Their
+approach, called DALL-E-Bot, enables a robot to generate
+images based on a text description using DALL-E [24], and
+accordingly arrange objects in a tabletop scenario. Similar to
+DALL-E-Bot, LLM-GROP achieves zero-shot performance
+using pre-trained models, but it is not restricted to a single
+top-down view of a table. In addition, we consider the
+uncertainty in manipulation and navigation, and optimize
+efficiency and feasibility in planning.
+C. Robot Planning with Large Language Models
+Many LLMs have been developed in recent years, such
+as BERT [25], GPT-3 [12], ChatGPT [13], CodeX [26],
+and OPT [27]. These LLMs can encode a large amount of
+common sense [14] and have been applied to robot task
+planning [15], [28]–[37]. For instance, the work of Huang
+et. al. showed that LLMs can be used for task planning in
+household domains by iteratively augmenting prompts [29].
+SayCan is another approach that enabled robot planning
+with affordance functions to account for action feasibility,
+where the service requests are specified in natural language
+(e.g., “make breakfast”) [30]. Compared with those methods,
+LLM-GROP optimizes both feasibility and efficiency while
+computing semantically valid geometric configurations.
+III. THE LLM-GROP APPROACH
+The objective of this task is to rearrange multiple tableware
+objects, which are initially scattered at different locations,
+into a tabletop configuration that is semantically valid and
+aligns with common sense. The robot is provided with prior
+knowledge about table shapes and locations, and equipped
+with skills of loading and unloading tableware objects. There
+are dynamic obstacles, e.g., chairs around tables, that can
+only be sensed at planning time. We consider uncertainty
+in navigation and manipulation behaviors. For instance, the
+robot can fail in navigation (at planning or execution time)
+when its goal is too close to tables or chairs, and it can fail
+in manipulation when it is not close enough to the target
+position. Note that uncertainties are treated as black boxes
+in this work.
+In this paper, we develop LLM-GROP that leverages
+LLMs to facilitate a mobile manipulator completing object
+rearrangement tasks. LLM-GROP consists of two key com-
+ponents, LLM for generating symbolic spatial relationships
+(Sec. III-A) and geometric spatial relationships (Sec. III-B)
+between objects, and TAMP for computing optimal task-
+motion plan (Sec. III-C), as shown in Fig. 2.
+A. Generating Symbolic Spatial Relationships
+LLMs are used to extract common sense knowledge re-
+garding symbolic spatial relationships among objects placed
+2087
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:59:11 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 3 ---
+Symbolic Spatial 
+Relationships
+Generator
+Geometric Spatial 
+Relationships Generator
+LLM
+TAMP
+Service Request 
+(E.g., set dinner table 
+with ‘plate’ and ‘fork’)
+“Fork is on the 
+left of bread plate”
+“Fork position 
+is (-0.1, 0.0)”
+Action 
+Sequence
+Trajectory
+Task-motion 
+plan
+Task Planner
+Goal Specification
+Utility Function
+Navigation
+& Manipulation
+Object Attributes
+Motion Planner
+“Fork’s width 
+is 4 cm”
+Fig. 2: LLM-GROP takes service requests from humans for setting tables
+and produces a task-motion plan that the robot can execute. LLM-GROP
+is comprised of two key components: the LLM and the Task and Motion
+Planner. The LLM is responsible for creating both symbolic and geometric
+spatial relationships between the tableware objects. This provides the
+necessary context for the robot to understand how the objects should be
+arranged on the table. The Task and Motion Planner generates the optimal
+plan for the robot to execute based on the information provided by the LLM.
+on a table. This is accomplished through the utilization of a
+template-based prompt:
+Template 1: The goal is to set a dining table
+with objects. The symbolic spatial relationship
+between objects includes [spatial relationships].
+[examples]. What is a typical way of positioning
+[objects] on a table? [notes].
+where [spatial relationships] includes a few spatial relation-
+ships, such as to the left of and on top of. In presence of
+[examples], the prompting becomes few-shot; when no ex-
+amples are provided, it is simplified to zero-shot prompting.
+In practice, few-shot prompts can ensure that the LLM’s
+response follows a predefined format, though more prompt
+engineering efforts are needed. [objects] refers to the objects
+to be placed on the table, such as a plate, a fork, and knife. To
+control the LLM’s output, [notes] can be added, such as the
+example “Each action should be on a separate line starting
+with ‘Place’. The answer cannot include other objects”.
+LLMs are generally reliable in demonstrating common
+sense, but there may be times when they produce contradic-
+tory results. To prevent logical errors, a logical reasoning-
+based approach has been developed to evaluate the con-
+sistency of generated candidates with explicit symbolic
+constraints. This approach is implemented on answer set
+programming (ASP), which is a declarative programming
+language that expresses a problem as a set of logical rules and
+constraints [38]. In the event of a logical inconsistency, the
+same template is repeatedly fed to the LLM in an attempt to
+elicit a different, logically consistent output. ASP enables re-
+cursive reasoning, where rules and constraints can be defined
+in terms of other rules and constraints, providing a modular
+approach to problem-solving [39]. ASP is particularly useful
+for determining whether sets of rules and constraints are true
+or false in a given context.
+The approach involves defining spatial relationships, their
+transitions, and rules for detecting conflicts. These rules
+are created by human experts and serve to ensure that the
+generated context is logical and feasible. One such rule is
+:- below(X,Y),right(X,Y), which states that object
+X cannot be both “below” and “to the right of” object Y at the
+same time. This rule ensures that the resulting arrangement
+of objects is physically possible. An instance of identifying a
+logical error is provided. For example, an LLM may generate
+instructions for arranging objects as follows:
+1) Place fruit bowl in the center of table.
+2) Place butter knife above and to the right of fruit bowl.
+3) Place dinner fork to the left of butter knife.
+4) Place dinner knife to the right of butter knife.
+5) Place fruit bowl to the right of dinner fork.
+6) Place water cup below and to the left of dinner knife.
+There are logical inconsistencies in the italic lines: Steps
+2 and 3 suggest placing the fruit bowl below the dinner fork,
+while Step 5 suggests placing the fruit bowl to the right of the
+dinner fork. This contradicts the established rule and results
+in no feasible solutions.
+B. Generating Geometric Spatial Relationships
+After determining the symbolic spatial relationships be-
+tween objects in Sec. III-A, we move on to generate their
+geometric configurations, where we use the following LLM
+template.
+Template 2: [object A] is placed [spatial rela-
+tionship] [object B]. How many centimeters [spa-
+tial relationship] [object B] should [object A] be
+placed?
+For instance, when we use Template 2 to generate prompt
+“A dinner plate is placed to the left of a knife. How many
+centimeters to the left of the water cup should the bread
+plate be placed?”, GPT-3 produces the output “Generally,
+the dinner knife should be placed about 5-7 centimeters to
+the right of the dinner plate.”
+To determine the positions of objects, we first choose a co-
+ordinate origin. This origin could be an object that has a clear
+spatial relationship to the tabletop and is located centrally. A
+dinner plate is a good example of such an object. We then
+use the recommended distances and the spatial relationships
+between the objects to determine the coordinates of the other
+objects. Specifically, we can calculate the coordinates of an
+object by adding or subtracting the recommended distances
+in the horizontal and vertical directions, respectively, from
+the coordinates of the coordinate origin. The LLM-guided
+position for the ith object is denoted as (xi, yi), where i ∈N.
+However, relying solely on the response of the LLMs is
+not practical as they do not account for object attributes such
+as shape and size, including tables constraints. To address
+this limitation, we have designed an adaptive sampling-based
+method that incorporates object attributes after obtaining the
+recommended object positions. Specifically, our approach
+involves sequencing the sampling of each object’s position
+using a 2D Gaussian sampling technique [40], with (xi, yi)
+as the mean vector, and the covariance matrix describing the
+probability density function’s shape.
+The resulting distribution is an ellipse centered at (xi, yi)
+with the major and minor axes determined by the covariance
+2088
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:59:11 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 4 ---
+Task: Set the table using 
+bread plate, fork, knife, bread
+1. Goto(fork), 
+Pickup(fork)
+2. Goto(table), 
+Place(fork, table)
+5. Goto(bread_plate), 
+Pickup(bread_plate)
+6. Goto(table), 
+Place(bread_plate, 
+table)
+3. Goto(knife), 
+Pickup(knife)
+4. Goto(table), 
+Place(knife, table)
+7. Goto(bread), 
+Pickup(bread)
+8. Goto(table), 
+Place(bread, 
+bread_plate)
+Fig. 3: An illustrative example of LLM-GROP showing the robot navigation trajectories (dashed lines) as applied to the task of “set the table with a bread
+plate, a fork, a knife, and a bread.” LLM-GROP is able to adapt to complex environments, using commonsense extracted from GPT-3 to generate efficient
+(i.e., minimize the overall navigation cost) and feasible (i.e., select an available side of the table to unload) pick-and-place motion plans for the robot.
+matrix. However, we do not blindly accept all of the sampling
+results; instead, we apply multiple rules to determine their
+acceptability, inspired by rejection sampling [41]. These rules
+include verifying that the sampled geometric positions adhere
+to symbolic relationships at a high level, avoiding object
+overlap, and ensuring that objects remain within the table
+boundary. For example, if the bounding box of an object
+position falls outside the detected table bounds, we reject
+that sample. The bounding box of objects and the table are
+computed based on their respective properties, such as size
+or shape. After multiple rounds of sampling, we can obtain
+M object configuration sequences.
+C. Computing Task-Motion Plans
+After identifying feasible object configurations on the
+tabletop in Steps 1 and 2, the next step is to place the
+objects on the tabletop based on one of object configuration
+sequences. At the task level, the robot must decide the
+sequence of object placement and how to approach the table.
+For example, if a bread is on top of a plate, the robot must
+first place the plate and then the bread. The robot must
+also determine how to approach the table, such as from
+which side of the table. Once the task plan is determined,
+the robot must compute 2D navigation goals (denoted as
+loc) at the motion level that connect the task and motion
+levels. Subsequently, the robot plans motion trajectories for
+navigation and manipulation behaviors.
+In the presence of dynamic obstacles, not all navigation
+goals (loc) are equally preferred. For instance, it might be
+preferable for the robot to position itself close to an object for
+placement rather than standing at a distance and extending its
+reach. A recent approach called GROP [17] was developed
+for computing the optimal navigation goal loc, which enabled
+the task-motion plan with the maximal utility for placing
+each object in terms of feasibility and efficiency given an
+object configuration (xi
+j, yi
+j), where 0 ≤j ≤M. Therefore,
+for different groups of object configurations, we use GROP
+to compute the maximal utility value of task-motion plans
+and select the best one for execution. Fig. 3 shows one task-
+motion plan generated using LLM-GROP for a four-object
+rearrangement task.
+IV. EXPERIMENTS
+In this section, we evaluate the performance of LLM-
+GROP using the task of rearranging tableware objects. The
+robot needs to compute semantically valid tabletop arrange-
+ments, plan to efficiently rearrange the objects, and realize
+the plan via navigation and manipulation behaviors.
+Baselines: LLM-GROP is evaluated by comparing its per-
+formance to three baselines, where the first baseline is the
+weakest.
+• Task Planning with Random Arrangement (TPRA): This
+baseline uses a task planner to sequence navigation
+and manipulation behaviors, while it randomly selects
+standing positions next to the target table and randomly
+places objects in no-collision positions on the table.
+• LLM-based Arrangement and Task Planning (LATP):
+It can predict object arrangements using LLMs and
+perform task planning. It uniformly samples standing
+positions around the table for manipulating objects.
+• GROP [17]: It considers plan efficiency and feasibility
+for task-motion planning, and lacks the capability of
+computing semantically valid arrangements. Similar to
+TPRA, GROP also randomly places objects in no-
+collision positions on the table.
+Experimental Setup: A mobile manipulator is assigned the
+task of setting a dinner table using a specific set of objects.
+In a simulated environment1, the robot needs to retrieve
+multiple objects from various locations and place them on the
+central table. Additionally, an obstacle (i.e., a chair) will be
+randomly placed around the table. There are eight tasks that
+involve handling different objects, as detailed in TABLE I.
+We execute each task 20 times using the LLM-GROP system
+1Implemented in the Gazebo simulator
+2089
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:59:11 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 5 ---
+TABLE I: Objects that are involved in our object rearrangement tasks for
+evaluation, where tasks 1-5 include three objects, tasks 6 and 7 include four
+objects, and task 8 includes five objects.
+Task #ID
+Objects
+1
+Dinner Plate, Dinner Fork, Dinner Knife
+2
+Bread Plate, Water Cup, Bread
+3
+Mug, Bread Plate, Mug Mat
+4
+Fruit Bowl, Mug, Strawberry
+5
+Mug, Dinner plate, Mug Lid
+6
+Dinner Plate, Dinner Fork, Mug, Mug Lid
+7
+Dinner Plate, Dinner Fork, Dinner Knife, Strawberry
+8
+Dinner Plate, Dinner Fork, Dinner Knife, Mug, Mug Lid
+TABLE II: Hypermeters of OpenAI’s GPT-3 engines in Our Experiment
+Parameter
+Value
+Parameter
+Value
+Model
+text-davinci-003
+Temperature
+0.1
+Top p
+1.0
+Maximum length
+512
+Frequency penalty
+0.0
+Presence penalty
+0.0
+TABLE III: Rating guidelines for human raters in the experiments. 1 point
+indicates the poorest tableware object arrangement as it suggests that some
+objects are missing. Conversely, 5 points represent the best arrangement.
+Points
+Rating Guidelines
+1
+Missing critical items compared with the objects listed at the top of
+the interface (e.g., dinner plate, dinner fork, dinner knife), making it
+hardly possible to complete a meal.
+2
+All items are present, but the arrangement is poor and major
+adjustments are needed to improve the quality to a satisfactory level.
+3
+All items are present and arranged fairly well, but still there is
+significant room to improve its quality.
+4
+All items are present and arranged neatly, though an experienced
+human waiter might want to make minor adjustments to improve.
+5
+All items are present and arranged very neatly, meeting the aesthetic
+standards of an experienced human waiter.
+with the same prompt templates, and after each task is
+completed, we capture an image of the table, the chair, and
+the objects on the tabletop for later human evaluation. To
+carry out our experiments, we used OpenAI’s GPT-3 engines.
+Please refer to TABLE II for the specific hyperparameters
+we adopted. We have chosen not to use ChatGPT, a well-
+known language LLM, for large-scale experiments due to the
+unavailability of its APIs.
+Rating Criteria: We recruited five graduate students with
+engineering backgrounds, three females and two males be-
+tween the ages of 22 and 30. We designed a five-point
+rating rule, which is outlined in Table III, and tasked the
+volunteers with scoring tableware object rearrangements in
+images they were shown. We generated 640 images from
+the four methods (three baselines and LMM-GROP) for
+eight tasks and each image required evaluation from all
+volunteers, resulting in a total sample size of 3200 images.
+The volunteers were shown one image at a time on a website2
+that we provided, and they scored each image from 1 to 5
+2The link for the questionnaire-based experiment results evaluation is
+http://150.158.148.22/
+Execution Time (s)
+5.0
+4.5
+4.0
+3.5
+3.0
+2.5
+2.0
+1.5
+1.0
+User Rating
+100       120       140        160       180       200        220       240       260
+Fig. 4: Overall performance of LLM-GROP as compared to three baselines
+based on mean values and standard errors of user ratings and robot execution
+time for all tableware object arrangement tasks.
+Task 1
+Task 2
+Task 3
+Task 4
+Task 5
+Task 6
+Task 7
+Task 8
+Fig. 5: Examples of tableware objects rearranged by our LLM-GROP agent
+in eight tasks, where the objects used in these tasks can be found in Table I.
+Our LLM-GROP enables the arrangement of tableware objects to be both
+semantically valid.
+based on the rating rules. We ensured that the rating was
+rigorous by using a website to collect rating results, thereby
+minimizing any potential biases that could arise from further
+interaction with the volunteers once they entered the website.
+LLM-GROP vs. Baselines: Fig. 4 shows the key findings of
+our experiments, which compares the performance of LLM-
+GROP to the three other baseline approaches. The x-axis in-
+dicates the time each method takes to complete a single task,
+while the y-axis indicates the corresponding user rating. The
+results demonstrate that our LLM-GROP achieves the highest
+user rating and the shortest execution time compared to the
+other approaches. While GROP proves to be as efficient as
+our approach, it receives a significantly lower rating score.
+By contrast, TPRA and LATP both receive lower user ratings
+than our LLM-GROP. They also display poor efficiency. This
+is because they lack the navigation capabilities to efficiently
+navigate through complex environments. For instance, when
+their navigation goals are located within an obstacle area,
+they struggle to adjust their trajectory, leading to longer task
+completion times.
+Fig. 5 provides several examples of various tasks that
+are rearranged by our agent. Fig. 6 presents the individual
+comparison results of each method for individual tasks. The
+2090
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:59:11 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 6 ---
+0
+1
+2
+3
+4
+5
+Task 1
+Task 2
+Task 3
+Task 4
+Task 5
+Task 6
+Task 7
+Task 8
+LLM-GROP (ours)
+LATP
+GROP
+TPRA
+Fig. 6: User ratings of individual object rearrangement tasks, with the x-axis representing the task and the y-axis representing the user rating score. It can
+be observed that LLM-GROP consistently performs the best compared to baselines. Tasks 1-5 involve three objects, tasks 6 and 7 involve four objects,
+and task 8 involves five objects. The numerical value displayed on each bar indicates the mean rating for the corresponding task.
+(8) Grasp Knife
+Knife
+(9) Place Knife
+(10) Grasp Fork
+Fork
+(11) Place Fork
+(12) Final Arrangements
+Table To Be Served
+(2) Grasp Cup
+Cup
+(1) Initial Configuration
+ (3) Place Cup
+(4) Grasp Plate
+Plate
+(5) Place Plate
+(6) Grasp Strawberry
+Fruit
+(7) Place Strawberry
+Fig. 7: We demonstrate LLM-GROP on real robot hardware. The real-robot system includes a Segway-based mobile platform and a UR5e robot arm. The
+robot employs hard-coded procedures for object grasping. The task is to serve a human with a knife, a fork, a cup, a plate, and a strawberry. The robot
+computes a plan that successfully avoids chairs and the human around the table, while being able to place the target objects in plausible physical positions.
+x-axis corresponds to Task #ID in Table I, while the y-
+axis represents the average user rating for each method.
+Our LLM-GROP demonstrates superior performance over
+the baselines for each task. Specifically, tasks 1 to 5 receive
+slightly higher scores than tasks 6 and 8. This is reasonable
+because the latter two tasks require the robot to manipulate
+more objects, posing additional challenges for the robot.
+Real Robot Demonstration:
+We tested our LLM-GROP
+approach on a real mobile robot platform to demonstrate its
+effectiveness in rearranging a set of tableware objects, as
+shown in Fig. 7. The set included a dinner plate, a dinner
+fork, a dinner knife, a water cup, and a strawberry. The robot
+started on the left table and is tasked with rearranging the
+objects on the right table in the left image. After successfully
+completing the task, the robot successfully rearranged the ob-
+jects as shown in the right image. The final object placements
+were semantically valid, such as the fork being on the left
+of the dinner plate and the strawberry being on the plate.
+These outcomes effectively demonstrate the effectiveness of
+our approach in performing real-world tasks using a robotic
+platform. We have generated a demo video that has been
+uploaded as part of the supplementary materials.
+V. CONCLUSION AND FUTURE WORK
+To summarize, we propose LLM-GROP, which demon-
+strates how we can extract semantic information from LLMs
+and use it as a way to make commonsense, semantically
+valid decisions about object placements as a part of a task
+and motion planner - letting us execute multi-step tasks
+in complex environments in response to natural-language
+commands. In the future, we may take more information
+from methods like M0M [42], in order to perform grasping
+and manipulation of fully unknown objects in unknown
+scenes, and expand to a wider set of placement problems.
+ACKNOWLEDGMENTS
+A portion of this work has taken place at the Autonomous
+Intelligent Robotics (AIR) Group, SUNY Binghamton. AIR
+research is supported in part by grants from the National
+Science Foundation (NRI-1925044), Ford Motor Company
+(URP Award 2019-2023), OPPO (Faculty Research Award
+2020), and SUNY Research Foundation.
+2091
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:59:11 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 7 ---
+REFERENCES
+[1] A. Szot, K. Yadav, A. Clegg, V.-P. Berges, A. Gokaslan, A. Chang,
+M. Savva, Z. Kira, and D. Batra, “Habitat rearrangement challenge
+2022,” https://aihabitat.org/challenge/rearrange_2022, 2022.
+[2] L. Weihs, M. Deitke, A. Kembhavi, and R. Mottaghi, “Visual room
+rearrangement,” in IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR), June 2021.
+[3] W. Goodwin, S. Vaze, I. Havoutis, and I. Posner, “Semantically
+grounded object matching for robust robotic scene rearrangement,” in
+2022 International Conference on Robotics and Automation (ICRA).
+IEEE, 2022, pp. 11 138–11 144.
+[4] W. Liu, C. Paxton, T. Hermans, and D. Fox, “Structformer: Learning
+spatial structure for language-guided semantic rearrangement of novel
+objects,” in 2022 International Conference on Robotics and Automa-
+tion (ICRA).
+IEEE, 2022, pp. 6322–6329.
+[5] Q. A. Wei, S. Ding, J. J. Park, R. Sajnani, A. Poulenard, S. Sridhar,
+and L. Guibas, “Lego-net: Learning regular rearrangements of objects
+in rooms,” arXiv preprint arXiv:2301.09629, 2023.
+[6] E. Huang, Z. Jia, and M. T. Mason, “Large-scale multi-object re-
+arrangement,” in 2019 International Conference on Robotics and
+Automation (ICRA).
+IEEE, 2019, pp. 211–218.
+[7] J. Gu, D. S. Chaplot, H. Su, and J. Malik, “Multi-skill mobile manip-
+ulation for object rearrangement,” arXiv preprint arXiv:2209.02778,
+2022.
+[8] J. E. King, M. Cognetti, and S. S. Srinivasa, “Rearrangement planning
+using object-centric and robot-centric action spaces,” in 2016 ICRA,
+pp. 3940–3947.
+[9] S. H. Cheong, B. Y. Cho, J. Lee, C. Kim, and C. Nam, “Where
+to relocate?: Object rearrangement inside cluttered and confined en-
+vironments for robotic manipulation,” in 2020 IEEE International
+Conference on Robotics and Automation (ICRA).
+IEEE, 2020, pp.
+7791–7797.
+[10] V. Vasilopoulos, Y. Kantaros, G. J. Pappas, and D. E. Koditschek, “Re-
+active planning for mobile manipulation tasks in unexplored semantic
+environments,” in 2021 IEEE International Conference on Robotics
+and Automation (ICRA).
+IEEE, 2021, pp. 6385–6392.
+[11] J. Liang, W. Huang, F. Xia, P. Xu, K. Hausman, B. Ichter, P. Florence,
+and A. Zeng, “Code as policies: Language model programs for
+embodied control,” arXiv preprint arXiv:2209.07753, 2022.
+[12] T. Brown, B. Mann, N. Ryder, M. Subbiah, J. D. Kaplan, P. Dhariwal,
+A. Neelakantan, P. Shyam, G. Sastry, A. Askell, et al., “Language
+models are few-shot learners,” Advances in neural information pro-
+cessing systems, vol. 33, pp. 1877–1901, 2020.
+[13] OpenAI, “Chatgpt,” Accessed: 2023-02-08, 2023, cit. on pp. 1, 16.
+[Online]. Available: https://openai.com/blog/chatgpt/
+[14] P. Liu, W. Yuan, J. Fu, Z. Jiang, H. Hayashi, and G. Neubig, “Pre-train,
+prompt, and predict: A systematic survey of prompting methods in
+natural language processing,” arXiv preprint arXiv:2107.13586, 2021.
+[15] W. Liu, T. Hermans, S. Chernova, and C. Paxton, “Structdiffusion:
+Object-centric diffusion for semantic rearrangement of novel objects,”
+arXiv preprint arXiv:2211.04604, 2022.
+[16] Y. Zhang and J. Chai, “Hierarchical task learning from language
+instructions with unified transformers and self-monitoring,” arXiv
+preprint arXiv:2106.03427, 2021.
+[17] X. Zhang, Y. Zhu, Y. Ding, Y. Zhu, P. Stone, and S. Zhang, “Visually
+grounded task and motion planning for mobile manipulation,” arXiv
+preprint arXiv:2202.10667, 2022.
+[18] M. Shridhar, J. Thomason, D. Gordon, Y. Bisk, W. Han, R. Mottaghi,
+L. Zettlemoyer, and D. Fox, “Alfred: A benchmark for interpreting
+grounded instructions for everyday tasks,” in Proceedings of the
+IEEE/CVF conference on computer vision and pattern recognition,
+2020, pp. 10 740–10 749.
+[19] V. Blukis, C. Paxton, D. Fox, A. Garg, and Y. Artzi, “A persistent spa-
+tial semantic representation for high-level natural language instruction
+execution,” in Conference on Robot Learning.
+PMLR, 2022, pp.
+706–717.
+[20] S. Y. Min, D. S. Chaplot, P. Ravikumar, Y. Bisk, and R. Salakhutdinov,
+“Film: Following instructions in language with modular methods,”
+arXiv preprint arXiv:2110.07342, 2021.
+[21] Y. Inoue and H. Ohashi, “Prompter: Utilizing large language model
+prompting for a data efficient embodied instruction following,” arXiv
+preprint arXiv:2211.03267, 2022.
+[22] I. Kapelyukh, V. Vosylius, and E. Johns, “Dall-e-bot: Introducing web-
+scale diffusion models to robotics,” arXiv preprint arXiv:2210.02438,
+2022.
+[23] W. Liu, C. Paxton, T. Hermans, and D. Fox, “Structformer: Learning
+spatial structure for language-guided semantic rearrangement of novel
+objects,” arXiv preprint arXiv:2110.10189, 2021.
+[24] A. Ramesh, P. Dhariwal, A. Nichol, C. Chu, and M. Chen, “Hierarchi-
+cal text-conditional image generation with clip latents,” arXiv preprint
+arXiv:2204.06125, 2022.
+[25] J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova, “Bert: Pre-training
+of deep bidirectional transformers for language understanding,” arXiv
+preprint arXiv:1810.04805, 2018.
+[26] M. Chen, J. Tworek, H. Jun, Q. Yuan, H. P. d. O. Pinto, J. Ka-
+plan, H. Edwards, Y. Burda, N. Joseph, G. Brockman, et al.,
+“Evaluating large language models trained on code,” arXiv preprint
+arXiv:2107.03374, 2021.
+[27] S. Zhang, S. Roller, N. Goyal, M. Artetxe, M. Chen, S. Chen, C. De-
+wan, M. Diab, X. Li, X. V. Lin, et al., “Opt: Open pre-trained trans-
+former language models,” arXiv preprint arXiv:2205.01068, 2022.
+[28] Y. Kant, A. Ramachandran, S. Yenamandra, I. Gilitschenski, D. Batra,
+A. Szot, and H. Agrawal, “Housekeep: Tidying virtual households
+using commonsense reasoning,” arXiv preprint arXiv:2205.10712,
+2022.
+[29] W. Huang, P. Abbeel, D. Pathak, and I. Mordatch, “Language models
+as zero-shot planners: Extracting actionable knowledge for embodied
+agents,” Thirty-ninth International Conference on Machine Learning,
+2022.
+[30] M. Ahn, A. Brohan, N. Brown, Y. Chebotar, O. Cortes, B. David,
+C. Finn, K. Gopalakrishnan, K. Hausman, A. Herzog, et al., “Do as
+i can and not as i say: Grounding language in robotic affordances,”
+arXiv preprint arXiv:2204.01691, 2022.
+[31] W. Huang, F. Xia, T. Xiao, H. Chan, J. Liang, P. Florence, A. Zeng,
+J. Tompson, I. Mordatch, Y. Chebotar, P. Sermanet, N. Brown, T. Jack-
+son, L. Luu, S. Levine, K. Hausman, and B. Ichter, “Inner monologue:
+Embodied reasoning through planning with language models,” in arXiv
+preprint arXiv:2207.05608, 2022.
+[32] I. Singh, V. Blukis, A. Mousavian, A. Goyal, D. Xu, J. Tremblay,
+D. Fox, J. Thomason, and A. Garg, “Progprompt: Generating situ-
+ated robot task plans using large language models,” arXiv preprint
+arXiv:2209.11302, 2022.
+[33] Y. Ding, X. Zhang, S. Amiri, N. Cao, H. Yang, A. Kaminski,
+C. Esselink, and S. Zhang, “Integrating action knowledge and llms for
+task planning and situation handling in open worlds,” arXiv preprint
+arXiv:2305.17590, 2023.
+[34] B. Liu, Y. Jiang, X. Zhang, Q. Liu, S. Zhang, J. Biswas, and P. Stone,
+“Llm+ p: Empowering large language models with optimal planning
+proficiency,” arXiv preprint arXiv:2304.11477, 2023.
+[35] Z. Zhao, W. S. Lee, and D. Hsu, “Large language models as com-
+monsense knowledge for large-scale task planning,” arXiv preprint
+arXiv:2305.14078, 2023.
+[36] J. Wu, R. Antonova, A. Kan, M. Lepert, A. Zeng, S. Song,
+J. Bohg, S. Rusinkiewicz, and T. Funkhouser, “Tidybot: Personal-
+ized robot assistance with large language models,” arXiv preprint
+arXiv:2305.05658, 2023.
+[37] K. Rana, J. Haviland, S. Garg, J. Abou-Chakra, I. Reid, and N. Suen-
+derhauf, “Sayplan: Grounding large language models using 3d scene
+graphs for scalable task planning,” arXiv preprint arXiv:2307.06135,
+2023.
+[38] M. Gebser, R. Kaminski, B. Kaufmann, M. Ostrowski, T. Schaub, and
+S. Thiele, “A user’s guide to gringo, clasp, clingo, and iclingo,” 2008.
+[39] Y.-q. Jiang, S.-q. Zhang, P. Khandelwal, and P. Stone, “Task planning
+in robotics: an empirical comparison of pddl-and asp-based sys-
+tems,” Frontiers of Information Technology & Electronic Engineering,
+vol. 20, no. 3, pp. 363–373, 2019.
+[40] V. Boor, M. H. Overmars, and A. F. Van Der Stappen, “The gaussian
+sampling strategy for probabilistic roadmap planners,” in Proceedings
+1999 IEEE International Conference on Robotics and Automation
+(Cat. No. 99CH36288C), vol. 2.
+IEEE, 1999, pp. 1018–1023.
+[41] W. R. Gilks and P. Wild, “Adaptive rejection sampling for gibbs
+sampling,” Journal of the Royal Statistical Society: Series C (Applied
+Statistics), vol. 41, no. 2, pp. 337–348, 1992.
+[42] A. Curtis, X. Fang, L. P. Kaelbling, T. Lozano-Pérez, and C. R.
+Garrett, “Long-horizon manipulation of unknown objects via task and
+motion planning with estimated affordances,” in 2022 International
+Conference on Robotics and Automation (ICRA).
+IEEE, 2022, pp.
+1940–1946.
+2092
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:59:11 UTC from IEEE Xplore.  Restrictions apply. 

@@ -1,0 +1,840 @@
+--- Page 1 ---
+10482
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 10, OCTOBER 2025
+NL2HLTL2PLAN: Scaling Up Natural Language
+Understanding for Multi-Robots Through
+Hierarchical Temporal Logic Task Speciﬁcations
+Shaojun Xu
+, Xusheng Luo
+, Member, IEEE, Yutong Huang, Letian Leng
+,
+Ruixuan Liu
+, Graduate Student Member, IEEE, and Changliu Liu
+, Senior Member, IEEE
+Abstract—To enable non-experts to specify long-horizon, multi-
+robot collaborative tasks, language models are increasingly used to
+translate natural language commands into formal speciﬁcations.
+However, because translation can occur in multiple ways, such
+translations may lack accuracy or lead to inefﬁcient multi-robot
+planning. Our key insight is that concise hierarchical speciﬁcations
+can simplify planning while remaining straightforward to derive
+from human instructions. We propose NL2HLTL2PLAN, a frame-
+work that translates natural language commands into hierarchi-
+cal Linear Temporal Logic (LTL) and solves the corresponding
+planning problem. The translation involves two steps leveraging
+Large Language Models (LLMs). First, an LLM transforms in-
+structions into a Hierarchical Task Tree, capturing logical and
+temporal relations. Next, a ﬁne-tuned LLM converts sub-tasks into
+standard LTL formulas, which are aggregated into hierarchical
+speciﬁcations, with the lowest level corresponding to ordered robot
+actions. These speciﬁcations are then used with off-the-shelf plan-
+ners. Our NL2HLTL2PLAN demonstrates the potential of LLMs in
+hierarchical reasoning for multi-robot task planning. Evaluations
+in simulation and real-world experiments with human participants
+show that NL2HLTL2PLAN outperforms existing methods, handling
+more complex instructions while achieving higher success rates and
+lower costs in task allocation and planning.
+Index Terms—Formal methods in robotics and automation,
+human-robot interaction, multi-robot systems.
+I. INTRODUCTION
+L
+ARGE Language Models (LLMs), trained on vast text
+corpora, display common sense reasoning abilities that en-
+able them to handle routine tasks expressed in human language,
+which opened up accessible ways for non-experts to instruct and
+interact with robots through natural language [1]. One approach
+Received 14 June 2025; accepted 25 July 2025. Date of publication 13 August
+2025; date of current version 2 September 2025. This article was recommended
+for publication by Associate Editor Y. Wang and Editor L. Pallottino upon
+evaluation of the reviewers’ comments. This work was supported by Siemens.
+(Shaojun Xu and Xusheng Luo contributed equally to this work.) (Corresponding
+author: Xusheng Luo.)
+Shaojun Xu is with the Department of Precision Instrument, Tsinghua Uni-
+versity, Beijing 100084, China (e-mail: xusj24@mails.tsinghua.edu.cn).
+Xusheng Luo, Yutong Huang, Letian Leng, Ruixuan Liu, and Changliu
+Liu are with Robotics Institute, Carnegie Mellon University, Pittsburgh, PA
+15213 USA (e-mail: xushengl@andrew.cmu.edu; yutongh3@andrew.cmu.edu;
+lleng@andrew.cmu.edu; ruixuanl@andrew.cmu.edu; cliu6@andrew.cmu.edu).
+Additional details are available at https://nl2hltl2plan.github.io/.
+This
+article
+has
+supplementary
+downloadable
+material
+available
+at
+https://doi.org/10.1109/LRA.2025.3598648, provided by the authors.
+Digital Object Identiﬁer 10.1109/LRA.2025.3598648
+is the neuro-symbolic paradigm [2], in which an intermediate
+formal speciﬁcation is derived from natural language input and
+subsequently used by existing solvers for planning, offering
+a structured and consistent interpretation of tasks [3]. This
+approach is data-efﬁcient, especially considering the limited
+availability of robotic data. Recently, [4] introduced the use of
+Linear Temporal Logic (LTL) as a standardized framework for
+specifying goals in embodied decision making, highlighting its
+expressiveness and compactness, which has led to its widespread
+use in robotics [5], [6].
+Directly translating natural language into LTL via LLMs is
+a straightforward but naive approach. This method often yields
+subpar results, as LLMs still struggle with logical reasoning [7],
+which limits their ability to generate well-structured logical for-
+mulas [8]. Moreover, the LTL formulas used in existing training
+datasets typically contain only two to four propositions [9],
+making them inadequate for handling instructions composed
+of multiple complex sentences. It is widely recognized that
+hierarchical models outperform ﬂat models in interpretability
+and efﬁciency [10], and decomposing tasks into sub-tasks has
+been proven scaling model ability in reasoning [11]. The core
+requirement is to develop speciﬁcations with compositional
+generalization ability while leveraging downstream planners’
+effectiveness [12]. However, effectively incorporating human-
+derived hierarchical insights into planners that adhere to inter-
+level constraint relationships still requires careful engineering.
+Our insight is that task hierarchy can be progressively obtained
+from language instruction with the help of an LLM. In light
+of the above, we propose harnessing LLMs as language-based
+task hierarchy extractors. Hierarchical Syntactically Co-safe
+Linear Temporal Logic (sc-LTL), a variant of formal languages
+introduced in work [13], is adopted as an intermediate task spec-
+iﬁcation, aligning well with hierarchically represented human
+instructions and having been applied to robotics [14], [15]. With
+hierarchy extraction, we can handle multiple-sentence instruc-
+tions involving multiple robots, while related work primarily
+focuses on short instructions for a single robot.
+We propose a two-step approach NL2HLTL2PLAN to unlock
+theexpressiveprowessoftemporallogic,convertinginstructions
+into hierarchical sc-LTL. Initially, upon receiving an instruc-
+tion, LLMs are prompted to iteratively decompose the task
+into a tree structure, incorporating both task breakdown and
+temporal relation extraction. Subsequently, in the second phase,
+sub-tasks of each task are translated into a single standard LTL
+formula via a ﬁne-tuned LLM. Through iterative processing of
+all sub-tasks of every task in the intermediary phase, we can
+2377-3766 © 2025 IEEE. All rights reserved, including rights for text and data mining, and training of artiﬁcial intelligence and similar technologies.
+Personal use is permitted, but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 2 ---
+XU et al.: NL2HLTL2PLAN: SCALING UP NATURAL LANGUAGE UNDERSTANDING FOR MULTI-ROBOTS THROUGH HIERARCHICAL
+10483
+construct hierarchical sc-LTL speciﬁcations, where the lowest
+level corresponds to sequentially ordered robot actions. This
+paradigm of using a formal representation is data efﬁcient and
+interpretable [3].
+With NL2HLTL2PLAN, human instructions are ready for use
+by off-the-shelf hierarchical sc-LTL planners, and applied to
+multi-robot systems with speciﬁed objectives like cost opti-
+mization, which differs from most works that only consider
+ﬁnding feasible solutions rather than optimizing under speciﬁc
+objectives. The translation of hierarchical task instructions into
+hierarchical LTL has been shown to be more straightforward and
+dependable compared to translating into a cumbersome standard
+formula, a challenge not solved by existing works [9], [16], [17].
+Contributions: 1) We proposed a neuro-symbolic method
+NL2HLTL2PLAN to extract task hierarchies from instructions
+to facilitate multi-robot planning for long-horizon tasks; 2) We
+developed a method that transforms language into hierarchical
+sc-LTL, thus integrating human-derived hierarchical knowledge
+in planning solvers; 3) We validated our method through sim-
+ulations and real-world experiments using instructions as input
+to formulate plans for multi-robot manipulation tasks.
+II. RELATED WORK
+Language-Conditioned Robotic Planning: Given instruc-
+tions, there are two primary methods for generating actions [3].
+The ﬁrst uses deep-learning techniques to translate instructions
+into low-level actions, such as joint states. Systems based on
+this have shown capabilities across multiple modalities [1],
+[18], but they depend on large volumes of data. Others trans-
+late instructions into an intermediate representation, and then
+employ off-the-shelf solvers to generate actions, which limits
+the solution space, further reducing the need for extensive data.
+The intermediate representations employed can vary from for-
+mal planning formalisms such as Planning Domain Deﬁnition
+Language (PDDL) and temporal logics, to less formal structures
+like code or predeﬁned skills.
+LLMs have been used to extract goal states and domain
+descriptions from instructions via prompting [19], [20], [21].
+Their capacity to generate low-level code or call APIs has
+been veriﬁed [22], [23], [24], [25]. An updatable skill library,
+instead of calling ﬁxed APIs, was introduced by Voyager [26]
+and SAYCAN [27], and enhanced by INNERMONOLOGUE [28],
+KNOWNO [29] through integrating feedback or help seeking
+ability. A commonality is their focus on single-robot scenarios,
+however, the extension to multi-robot scenarios remains largely
+unexplored.
+Natural Language to Temporal Logic: Early attempts at
+translating natural language into temporal logics relied on
+grammar-based methods, excelling at processing structured in-
+puts [30]. Recently, leveraging tools like GPT to generate LTL
+formulas [17], [31] has gained traction. However, grounding
+language in robotics—linking linguistic instructions to physical
+actions and environments remains a critical issue. To address
+this, [32] ﬁne-tuned an LLM using a synthetic dataset of pairs
+of temporal logic formulas and natural language instructions in
+quadrotor tasks. Similarly, weakly supervised semantic parsers
+have been developed to learn from execution trajectories with-
+out requiring explicit LTL annotations [33]. Systems such as
+LANG2LTL [34], NL2TL [16], and others [35] employ LLMs to
+convert domain-speciﬁc commands (e.g., for navigation or mo-
+tion planning) into formal speciﬁcations. In contrast, [36] adopts
+a predeﬁned LTL speciﬁcation approach, where predicates are
+deﬁned using succinct human instructions. Our NL2HLTL2PLAN
+extends these capabilities, supporting more complex speciﬁca-
+tions with over 10 atomic propositions and enabling task alloca-
+tionacrossmultiplerobots—surpassingthescopeofpriorworks,
+which typically handle fewer than ﬁve atomic propositions.
+LLMs to Multi-Robots: To tackle the problem, a notable
+trend in adapting LLMs for use in multi-robot systems is ris-
+ing. SMART-LLM [25] uses an LLM to synthesize code that
+facilitates task decomposition, coalition formation, and task
+allocation. Multiple intermediate approaches have been imple-
+mented in multi-robot planning, such as dialogue-based frame-
+work [37], behavior trees [38], batch of multi-communication
+frameworks (centralized, decentralized, or hybrid) [39], and oth-
+ers address deadlock resolution in navigation scenarios [40]. A
+Decentralized LLM-based planner [41] and global LLM-based
+planners [42] have been introduced to enhance the efﬁciency
+of target searches or make individual decisions autonomously.
+However, the works mentioned above focus on ﬁnding feasible
+solutions. In contrast, our research can optimize the cost and
+time required to complete tasks.
+III. HIERARCHICAL LINEAR TEMPORAL LOGIC
+Linear Temporal Logic (LTL) is composed of basic state-
+ments, referred to as atomic propositions AP, along with
+boolean operators such as conjunction (∧) and negation (¬),
+temporal operators like next (⃝) and until (U) [43]:
+φ := ⊤| π | φ1 ∧φ2 | ¬φ | ⃝φ | φ1 U φ2,
+(1)
+where ⊤stands for a true statement and π is a boolean valued
+atomic proposition. Other temporal operators can be derived
+from U, such as ♦φ, means φ will eventually be true. We focus
+on a subset of LTL known as syntactically co-safe formulas
+(sc-LTL) [44]. Any LTL formula encompassing only temporal
+operators ♦and U and written in positive normal form (negation
+is exclusively before atomic propositions) is classiﬁed under
+sc-LTL formulas [44], which can be satisﬁed by ﬁnite sequences
+followed by any inﬁnite repetitions, making sc-LTL apt for
+reasoning about robot tasks with ﬁnite duration.
+Deﬁnition III.1 (Hierarchical sc-LTL [13]): Hierarchical sc-
+LTL is structured into K levels, labeled L1, . . . , LK, arranged
+from the highest to the lowest. Each level Lk with k ∈[K]
+([K] = {1, . . . , K}), contains nk sc-LTL formulas. The hier-
+archical sc-LTL speciﬁcation is represented as Φ = {φi
+k | k ∈
+[K], i ∈[nk]}, where φi
+k denotes the i-th sc-LTL formula at
+level Lk. Let Φk denote the set of formulas at level Lk, and let
+Prop(φi
+k) represent the set of propositions appearing in formula
+φi
+k. The hierarchical sc-LTL follows:
+1) There is exactly one formula at the highest level: n1 = 1.
+2) Each formula at level Lk consists either entirely of atomic
+propositions, i.e., Prop(φi
+k) ⊆AP, or entirely of formu-
+las from the next lower level, i.e., Prop(φi
+k) ⊆Φk+1.
+3) Each formula at level Lk+1 appears in exactly one formula
+at the next higher level: φi
+k+1 ∈
+j∈[nk] Prop(φj
+k) and
+Prop(φj1
+k ) ∩Prop(φj2
+k ) = ∅, for j1, j2 ∈[nk], j1 ̸= j2.
+We refer to each speciﬁcation φk
+i in Φ as a standard speciﬁca-
+tion,whichcanbeorganizedinatree-likespeciﬁcationhierarchy
+graph, where each node represents a standard sc-LTL speci-
+ﬁcation. Edges between nodes indicate that one speciﬁcation
+belongs to another as a composite proposition. The leaf nodes
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 3 ---
+10484
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 10, OCTOBER 2025
+represent leaf speciﬁcations that consist only of atomic propo-
+sitions, while non-leaf nodes represent non-leaf speciﬁcations
+made up of composite propositions.
+Example 1 (Dishwasher Loading Problem): Consider the
+dishwasher loading instruction: “Place the plates, mugs and
+utensils in the lower rack. Then, put the saucers in the upper
+rack, followed by the cups.” The hierarchical sc-LTL is:
+L1 :
+φ1
+1 = ♦(φ1
+2 ∧♦φ2
+2)
+L2 :
+φ1
+2 = ♦πl
+plates ∧♦πl
+mugs ∧♦πl
+utensils
+φ2
+2 = ♦(πu
+saucers ∧♦πu
+cups),
+(2)
+where φ1
+2 and φ2
+2 are composite propositions, and the formula
+♦(φ1
+2 ∧♦φ2
+2) speciﬁes that φ1
+2 should be fulﬁlled before moving
+on to φ2
+2. πj
+i represents atomic propositions, denoting the act of
+placing a speciﬁc type of dishware. Note that the lowest level
+L2 only includes atomic propositions. Furthermore, each atomic
+proposition can be expanded into a sequence of primitive ac-
+tions implemented as APIs, such as πl
+plates = ♦(Pickup(plate) ∧
+♦Move(plate, lower_rack)).
+IV. METHODOLOGY: NL2HLTL2PLAN
+LLMs excel in common sense reasoning but perform poorly
+in logical reasoning and lack grounding in the available robot
+skills [7], [45]. Therefore, we propose a two-stage method for
+translating natural language into hierarchical sc-LTL using an
+intermediary structure known as the Hierarchical Task Tree. We
+emphasize the distinction between hierarchical structure and
+temporal constraints. The hierarchical structure originates from
+the task itself, whereas temporal relations, such as “ﬁrst” and
+“then” in Example 1, reﬂect user preferences.
+A. Conversion From Instructions to Hierarchical Task Tree
+Deﬁnition IV.1 (Hierarchical Task Tree (HTT)): A Hierarchi-
+cal Task Tree (HTT) is a tree T = (V, E, R), where
+r V = {v1, v2, . . . , vn} denotes the set of nodes. Each node
+is associated with an instruction of its respective task;
+r E ⊆V × V represents the edges, indicating a decomposi-
+tion relationship between tasks. An edge e = (v1, v2) ∈E
+implies that child task v2 is in sub-tasks set of parent task
+v1. The node set V can be partitioned into multiple disjoint
+subsets {V1, . . . , Vm}, such that all nodes within the same
+subset Vi share the same parent node.
+r R ⊆V × V deﬁnes the set of temporal relations between
+sibling tasks, which are decompositions of the same parent
+task. A relation (v1, v2) ∈R, where v1, v2 ∈Vi for some
+i ∈{1, . . . , m}, indicates that task v1 should be completed
+before task v2.
+The HTT is speciﬁcally designed to align with the structure of
+hierarchical sc-LTL. The tree unfolds level by level, where each
+child task is a decomposition of its parent task. The relation R
+speciﬁcally captures the temporal relationships between sibling
+tasks that share the same parent. The temporal relationship be-
+tween any two tasks can be inferred by tracing their lineage back
+to their common ancestor. An LLM is employed to construct the
+HTT through a two-step process from a given task instruction,
+as outlined in step 1 of Fig. 2.
+1) HTT without temporal relations R: The ﬁrst step involves
+generating the nodes V and edges E, excluding the temporal
+Fig. 1.
+A sequence of images, arranged from left to right and top to bottom,
+depicts the task. “First, put a set of keychains on the armchair. Retrieve a pencil
+and put it on the side table. Move the phone and the bat to the bed in any
+order”, objects and their trajectories are marked with different colors as follows,
+keychains (red), bat (blue), pencil (purple) and phone (green). t represents the
+discrete time steps in simulation.
+relations R. The LLM is employed to decompose the whole
+task into a structured hierarchy and the decomposition continues
+until a task consists solely of sequential operations performed
+on a single object.
+2) Add temporal relations R: For each non-leaf node v, we
+consider V′, which represents its child tasks at the level directly
+beneath it. Then the temporal relations between sibling tasks
+within V′ are determined by LLM.
+B. Generation of Task-Wise Standard LTL Speciﬁcations
+Once the HTT representation is obtained, a standard LTL
+formula is generated for each node via a BFS; see Algorithm. 1.
+1) Logical search: For every non-leaf node v, we gather
+its child tasks V′ and the temporal relations among them,
+deﬁned by R′ ⊆V′ × V′ . We then use an LLM to rephrase
+these child tasks with their temporal relations into syntac-
+tically correct sentences aligned with the semantics of LTL
+speciﬁcations (as illustrated in step 2.1in Fig. 2). A ﬁne-tuned
+LLM is then used as a translator to obtain a single LTL for-
+mula from reformulated sentences (as depicted in step 2.2in
+Fig. 2). To this end, we ﬁrst developed a dataset comprising
+pairs of natural language descriptions and their correspond-
+ing LTL formulas, and then ﬁne-tuned a language model for
+translation, Mistral-7B-Instruct-v0.2 [46]. Training
+datasets were synthesized from sources including Efﬁcient-Eng-
+2-LTL [32], Lang2LTL [34], nl2spec [17], and NL2TL [16].
+Given the domain-speciﬁc nature of these datasets, we sub-
+stituted speciﬁc tasks with generic symbols such as “task 1.1
+should be completed before task 1.2” paired with the LTL φ =
+♦(task1.1 ∧♦task1.2), which allows the ﬁne-tuned LLM to
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 4 ---
+XU et al.: NL2HLTL2PLAN: SCALING UP NATURAL LANGUAGE UNDERSTANDING FOR MULTI-ROBOTS THROUGH HIERARCHICAL
+10485
+Fig. 2.
+Overview of the framework NL2HLTL2PLAN. The non-leaf nodes in the Hierarchical Task Tree (see Section IV-A), the language descriptions of sub-tasks,
+and the standard speciﬁcations are color-coded to indicate one-to-one correspondence. Summary snippets of the prompts are provided, with more information
+accessible on the project page https://nl2hltl2plan.github.io/
+Algorithm 1: Construction of hierarchical sc-LTL.
+act as a non-related translator of tasks, as demonstrated in [16],
+[32]. Next, we ask an LLM to reinterpret these “lifted” LTL spec-
+iﬁcations, creating a domain-agnostic dataset containing 509
+unique LTL formulas and 10621 natural language descriptions
+produced by the LLM.
+2) Action completion: Given an HTT, each leaf node repre-
+sents a simple task on certain objects, such as “task 1.1.1: place
+plates into the lower rack” in Fig. 2. Viewing such a simple task
+asasequenceofactionsteps,anLLMisaskedtoexpandtheshort
+instruction into a sequence of predeﬁned APIs. This approach
+helps improve alignment with robot skills and has demonstrated
+effectiveness [22]. For instance, the symbol πl
+plates that rep-
+resents task 1.1.1 can be replaced with an LTL speciﬁcation
+composed of sequential APIs: πl
+plates = ♦(Pickup(plate) ∧
+♦Move(plate, lower_rack)); see step 2.2in Fig. 2. Af-
+ter this step, complete hierarchical sc-LTL speciﬁcations are
+generated.
+Remark IV.2: Assuming the HTT contains n1 non-leaf nodes
+and n2 leaf nodes, our method queries the LLM 2(n1 + n2) + 1
+times. Firstly, an LLM is queried once to create the HTT without
+temporal relations. Subsequently, in n1 + n2 times, temporal
+relations for non-leaf nodes and serial actions for leaf nodes are
+derived. Finally, nodes are translated to standard LTL formulas
+in n1 + n2 times via a ﬁne-tuned LLM.
+V. EXPERIMENTAL RESULTS
+We evaluate the performance of NL2HLTL2PLAN both in the
+simulated and real-world environments. For simulation, we use
+the AI2-THOR simulator [47], an interactive 3D domestic envi-
+ronment, coupled with the ALFRED dataset [48], which focuses
+on natural language comprehension and embodied actions. In
+real-world experiments, we arrange objects on a tabletop us-
+ing single or multiple robotic arms via handover. We employ
+GPT-4 [49] and aim to answer three key questions:
+Q1. IS NL2HLTL2PLAN capable of reasoning over com-
+plex human instructions effectively?
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 5 ---
+10486
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 10, OCTOBER 2025
+Fig. 3.
+Comparison of pipelines from natural language to plans between
+SMART-LLM and NL2HLTL2PLAN.
+Q2. DOES NL2HLTL2PLAN achieve higher success rates
+while maintaining high solution quality?
+Q3. IS NL2HLTL2PLAN ﬂexible enough to adjust to the
+verbal styles of various users?
+A. Mobile Manipulation Tasks in AI2-THOR
+1) Tasks: The ALFRED dataset contains task instructions with
+strictly sequential steps, which we classify as base tasks to create
+more complex tasks. The base tasks in the same scenes involving
+distinct objects are randomly combined with randomly gener-
+atedtemporalrelationshipsandthenreformulatedintoderivative
+tasks by the LLM to align more naturally with human expression
+patterns. The task complexity is reﬂected by the number of tasks,
+varying from 1 to 4, with 50 tasks for each category, and one of
+them is shown in Fig. 1. We then assign 1, 2, or 4 robots, each
+with random initial positions within the ﬂoor plan, leading to
+4 × 50 × 3 = 600 test scenarios. A search-based planner [13]
+is used for simultaneous task allocation and planning in a multi-
+robot system. The planner minimizes the weighted sum of plan
+cost and completion time by approximating the search space
+as a collection of loosely interconnected subspaces, each corre-
+sponding to an LTL speciﬁcation. The search process primarily
+operates within a single subspace, transitioning to another based
+on the decomposition of tasks.
+2) Comparison: We compare our method with three other
+approaches: SMART-LLM [25], naive NL2HLTL, and SYN-
+THTL [50]. SMART-LLM uses an LLM to generate Python scripts
+invoking predeﬁned actions to perform task decomposition and
+task allocation. The diagram comparison of these two pipelines
+is shown in Fig. 3. Naive NL2HLTL is an approach that di-
+rectly translates natural language into hierarchical sc-LTL using
+in-context learning. SYNTHTL, originally designed for standard
+LTL, employs a two-step translation process based on tree
+decomposition, primarily driven by sentence structure rather
+than task semantics. It relies on an oracle (e.g., human experts)
+at each decomposition and translation stage to verify correct-
+ness. To ensure a fair comparison in SYNTHTL, an LLM-based
+veriﬁer is employed to replace human intervention in assessing
+the precision of the decomposition and translation. However,
+PDDL-based approaches face signiﬁcant challenges in solving
+temporal constraints for the tasks discussed here.
+Metrics: We consider the following metrics. 1) Success rate,
+which measures whether the target goal states of objects are
+achieved and whether the states’ occurrence order satisﬁes the
+TABLE I
+THE SUCCESS RATE COLUMN FIRST PRESENTS THE OVERALL SUCCESS RATE,
+WITH THE SUCCESS RATES FOR CONVERSION AND PLANNING IN PARENTHESES
+temporal constraints. For a detailed analysis, we further break it
+down into two separate components: a) conversion, b) planning.
+2) Travel cost, measured in meters, is deﬁned as the total distance
+traveled by all robots, assuming no movements in manipulation.
+3) Completion time, quantiﬁed as the number of discrete time
+steps used to complete the tasks.
+3) Results: The dimensions of grid maps range from (25∼
+30) × (25 ∼30) based on scene size. The statistical results are
+shown in Table I, which are organized based on the number
+of base tasks included in the derivative tasks. This provides
+afﬁrmative answers to our ﬁrst two questions Q1 and Q2.
+SMART-LLM is limited to solving derivative tasks with only
+one base task, whereas our method can handle up to 4 tasks.
+For tasks comprising more than two base tasks, SMART-LLM’s
+output exceeds the context window of GPT-4 (as its reasoning
+relies on the whole context), indicating that it uses a signiﬁcant
+number of tokens to generate Python scripts. To address this,
+we introduced an additional layer atop SMART-LLM, providing
+a satisfying sequence of base tasks decomposed from derivative
+tasks. Then each base task is sequentially processed through
+SMART-LLM to obtain a viable solution. In general, our approach
+not only achieves a higher success rate but also results in plans
+thataremorecost-effectiveandrequirelesstimetocomplete.For
+derivative tasks comprising 4 base tasks, SMART-LLM exhibits a
+considerably lower success rate. However, NL2HLTL2PLAN still
+attains a success rate of approximately 84% when converting
+to hierarchical sc-LTL. As the number of robots increases, both
+travel costs and completion times decrease due to the parallel
+execution of base tasks. However, the success rate slightly
+decreases during the planning phase when more robots are
+involved as the off-the-shelf planning search time exceeds the
+ﬁve-minutetimeout.Morerobotscanbehandledbyupgradingto
+a more capable downstream planner. This ﬂexibility in utilizing
+off-the-shelf planners differentiates our approach from existing
+studies where LLMs are primarily used for task allocation. Note
+that only travel cost and completion time for successfully com-
+pleted tasks are recorded. Therefore, the data for SMART-LLM
+are not fully representative due to its lower success rate. Tasks
+of higher complexity, which typically involve higher travel costs
+and longer completion times, are more likely to fail and are thus
+excluded from the data. A series of snapshots capturing task
+execution is displayed in Fig. 1.
+Table II presents a comparison of translation accuracy be-
+tween our method, the naive NL2HLTL approach, and SYN-
+THTL. We focus solely on translation accuracy, as all methods
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 6 ---
+XU et al.: NL2HLTL2PLAN: SCALING UP NATURAL LANGUAGE UNDERSTANDING FOR MULTI-ROBOTS THROUGH HIERARCHICAL
+10487
+TABLE II
+COMPARISON IN TERMS OF TRANSLATION ACCURACY
+can use the same downstream planner. Note that the latter two
+methods were not originally designed to handle hierarchical
+sc-LTL. For tasks involving only a single base task—i.e., one
+atomic proposition—we apply both methods to generate a single
+sc-LTL formula directly composed of action APIs. However,
+when multiple base tasks are present, we adapt these meth-
+ods to generate a single sc-LTL formula composed solely of
+atomic propositions, without expanding each into sequences of
+action APIs; otherwise, the resulting formula would become
+prohibitively long. Overall, our method achieves higher transla-
+tion accuracy. In particular, the performance of naive NL2HLTL
+degrades rapidly as the number of atomic propositions increases.
+For tasks with only one base task, SYNTHTL often fails to
+identify the appropriate APIs, resulting in lower accuracy than
+naive NL2HLTL. For tasks involving multiple base tasks, SYN-
+THTLexpectssemi-structuredinputratherthanfree-formnatural
+language. Its strict grammar check can cause it to terminate
+prematurely. We emphasize that our method is not mutually
+exclusive with single-formula translation approaches, such as
+SYNTHTL, since our framework can leverage these methods to
+translate each node in the HTT into an LTL formula.
+B. Real-World Rearrangement Involving Human Participants
+The real-world tabletop experiment involves a robotic arm
+placing fruits and vegetables onto colored plates on a 2D plane.
+Thissingle-armsetup,usingthesameplanner[13],simpliﬁesthe
+task as it eliminates task allocation. Our evaluation has two as-
+pects: a) the adaptability to verbal tones and styles from various
+users; and b) the comparative effectiveness of the plan generated
+from our method against existing methods. To explore the ﬁrst
+aspect, we conducted a user study with 4 participants, asking
+each to rephrase the task instructions according to personal style,
+whilemaintainingtheoriginalsemantics.1 Forthesecondaspect,
+we employ an LLM as the task planner, explicitly prompting
+it to minimize trajectory length based on the provided initial
+2D coordinates of all objects and robotic arms. This approach
+directly generates a sequence of API calls, similar to the method
+used in PROGPROMPT [22]. The dataset contains instructions for
+fourarrangementtasks,eachspeciﬁedwithtemporalconstraints,
+with 25 derived test cases per task from the LLM to address
+the probabilistic behavior of the LLM. In each scenario, object
+locations are randomized. The cost metric used is the projected
+travel distance of the robotic arm within a 2D space.
+The results are presented in Table III, which positively an-
+swers Q3. As observed, both NL2HLTL2PLAN and the LLM
+achieve a high success rate, which aligns with the expectations
+given the task complexities. Regarding cost, with multiple feasi-
+ble solutions, NL2HLTL2PLAN consistently produces lower-cost
+paths, with the exception of task 1. In this task, the LLM
+manages to create an optimal plan given the placement of fruits.
+1The experiment did not gather personal information from the participants.
+TABLE III
+STATISTICAL RESULTS FROM TABLETOP EXPERIMENTS
+Fig. 4.
+Comparative snapshots between NL2HLTL2PLAN and an LLM for task
+6. NL2HLTL2PLAN generates an optimal trajectory, whereas the LLM follows
+the sequence in which the fruits are mentioned in the instructions.
+Fig. 5.
+Four arms in square conﬁgurations or straight line, where symbols
+E, F and G represent source locations and H, I and J denote target locations.
+The runtimes include the time to obtain the executable action
+sequence. NL2HLTL2PLAN experienced slightly longer runtimes
+compared to the LLM because querying times vary across differ-
+ent HTT structures. Comparison between NL2HLTL2PLAN and
+the LLM is displayed in Fig. 4.
+C. Multi-Robot Handover Tasks
+We examine the execution of multiple-object pick-and-place
+tasks by four ﬁxed robot arms, which are either aligned in a
+straight line or arranged in a square conﬁguration; see Fig. 5.
+Certain tasks might necessitate the transfer of objects between
+robots, depending on their proximity. The planner [15] produces
+collision-free trajectories by simultaneously considering task
+and motion planning. The prompt for the baseline that directly
+uses the LLM as task planner is illustrated in Fig. 2.
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 7 ---
+10488
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 10, OCTOBER 2025
+TABLE IV
+STATISTICAL RESULTS FOR MULTI-ROBOT HANDOVER. THE FIRST FIVE TASKS
+USE A SQUARE ARM FORMATION; THE LAST THREE USE A LINEAR
+ALIGNMENT
+TABLE V
+STATISTICS OF FAILURE CASES. THE RESULTS DERIVE FROM SCENARIOS IN
+SECTIONS V-A AND V-C, ENCOMPASSING 208 TASK DESCRIPTIONS
+ALTOGETHER. THE RATE IS DETERMINED ACROSS THE TOTAL INSTANCES IN
+THE HTT. AN HTT COMPRISING n NON-LEAF NODES AND m LEAF NODES
+ACCOUNTS FOR m INSTANCES IN ACTION COMPLETION AND n INSTANCES
+ACROSS THE OTHER THREE CATEGORIES
+Table IV displays eight multi-stage pick-and-place tasks with
+temporal constraints. For the LLM-based planner, a planning
+scheme is deemed successful if it allows for the sequential
+actions of multiple robots to be executed successfully while
+adhering to the temporal constraints. It is evident that for tasks
+involving robot handovers, the success rate of the LLM-based
+planner decreases due to the need for cooperative planning.
+Considering the probabilistic output of GPT-4, we conducted 10
+tests per task to enhance the diversity of the LLM’s responses.
+The results indicate that by dividing the planning process into
+task hierarchical extraction and LTL-based optimization, we
+can effectively bypass direct control of robots’ low-level move-
+ments, thereby improving completion of multi-stage handover
+tasks. Moreover, we conducted experiments in a real-world
+setting with four robotic arms, and a series of snapshots are
+presented in Fig. 6.
+D. Analysis of Failure Reasons
+We categorize the causes of failure into four groups, each
+aligning with the four stages described in Sections IV-A
+and IV-B. These failure rates are presented in Table V.
+1) Task decomposition: The breakdown of tasks might omit
+certain subtasks. For instance, a decomposition of “Heat a sliced
+Fig. 6.
+Snapshots depict four arms performing real-world tasks of picking and
+placing objects via handover. The instruction given is, “Please move the blue,
+green, and multi-colored blocks to the two opposite boxes, place the colored
+ones after the green ones.” Target areas are colored in magenta. The block being
+selected is emphasized with an ellipse, and the remaining blocks are contained
+within rectangles. The colored curves with arrows illustrate the trajectories of the
+end-effectors, where head-to-head arrows indicate handovers between robotic
+arms.
+tomato in the microwave.” could be “1.1 slice a tomato, 1.2 heat
+the tomato in the microwave”. However, there is a necessary
+intermediate step absent between 1.1 and 1.2, which should be
+1.2 place the tomato in the microwave.
+2) Temporal extraction: Ambiguous wording might cause an
+LLM to recognize only a subset of temporal relations. Consider
+the sequence: “Put a piece of bread in the oven [1.1], place a
+pot in the pool [1.2]. At any time, move a bowl to a desk [1.3].”
+The output suggests 1.2 and 1.3 can occur in any order, and
+1.2 follows 1.1. This inference arises from the absence of clear
+directives on order. A better inference would indicate that 1.1
+and 1.2 can be performed in any order.
+3) LTL translation: The conversion process may result in
+inaccuracies. For example, the speciﬁed task sequence “First
+1.1, then 1.2, 1.3, and 1.4 can be completed in any order”
+is erroneously translated as ♦(p1.1 ∧(♦(p1.2 ∧(p1.3 ∧p1.4)))).
+Thecorrectformulashouldbe♦(p1.1 ∧♦p1.2 ∧♦p1.3 ∧♦p1.4).
+4) Action completion: Redundant actions that duplicate pre-
+vious ones may occur. For instance, the phrase “Place the sliced
+tomato on the pan,” which functions as a leaf node in the HTT,
+implies that the tomato has already been sliced. A redundant
+sequence like “pick(tomato), slice(tomato), put(pan, tomato)”
+would be inappropriate here, as it reﬂects the actions for a
+non-leaf node, such as “Place a sliced tomato on the pan.”
+VI. CONCLUSIONS AND LIMITATIONS
+We proposed NL2HLTL2PLAN to transform unstructured lan-
+guage into a structured, hierarchical formal representation–
+hierarchical LTL, where the lowest level corresponds to sequen-
+tially ordered robot actions. The task representation is ready to
+be used by off-the-shelf planners for multi-robot systems. Our
+simulation and real-world experiment outcomes demonstrated
+that the framework offers an intuitive and user-friendly approach
+for deploying robots in daily situations.
+Limitations: The NL2HLTL2PLAN operates as an open loop
+without feedback. To transition to a closed-loop one, it is es-
+sential to integrate a syntax checker and a semantic checker.
+The syntax checker veriﬁes adherence to the hierarchical sc-LTL
+structure. Meanwhile, the semantic checker offers feedback on
+errors when the planner fails.
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 8 ---
+XU et al.: NL2HLTL2PLAN: SCALING UP NATURAL LANGUAGE UNDERSTANDING FOR MULTI-ROBOTS THROUGH HIERARCHICAL
+10489
+ACKNOWLEDGMENT
+Shaojun Xu was an intern at CMU, when this work was
+conducted.
+REFERENCES
+[1] A. O’Neill et al., “Open X-embodiment: Robotic learning datasets and
+RT-X models: Open X-embodiment collaboration 0,” in Proc. 2024 IEEE
+Int. Conf. Robot. Automat., 2024, pp. 6892–6903.
+[2] V. Belle et al., “Neuro-symbolic AI agent systems: A ﬁrst reﬂection on
+trends, opportunities and challenges,” in Proc. Int. Conf. Auton. Agents
+Multiagent Syst., 2023, pp. 180–200.
+[3] V. Cohen, J. X. Liu, R. Mooney, S. Tellex, and D. Watkins, “A survey of
+roboticlanguagegrounding:Tradeoffsbetweensymbolsandembeddings,”
+in Proc. 33rd Int. Joint Conf. Artif. Intell., 2024, pp. 7999–8009.
+[4] M. Li et al., “Embodied agent interface: Benchmarking LLMs for em-
+bodied decision making,” in Proc. 38th Conf. Neural Inf. Process. Syst.
+Datasets Benchmarks Track, 2024, pp. 100428–100534.
+[5] X. Luo, Y. Kantaros, and M. M. Zavlanos, “An abstraction-free method for
+multirobot temporal logic optimal control synthesis,” IEEE Trans. Robot.,
+vol. 37, no. 5, pp. 1487–1507, Oct. 2021.
+[6] X. Luo and M. M. Zavlanos, “Temporal logic task allocation in het-
+erogeneous multirobot systems,” IEEE Trans. Robot., vol. 38, no. 6,
+pp. 3602–3621, Dec. 2022.
+[7] F. Xu, Q. Lin, J. Han, T. Zhao, J. Liu, and E. Cambria, “Are large language
+models really good logical reasoners? A comprehensive evaluation and
+beyond,” IEEE Trans. Knowl. Data Eng., vol. 37, no. 4, pp. 1620–1634,
+Apr. 2025.
+[8] K. Valmeekam, A. Olmo, S. Sreedharan, and S. Kambhampati, “Large
+language models still can’t plan (a benchmark for LLMs on planning
+and reasoning about change),” in Proc. NeurIPS 2022 Found. Models
+Decis. Mak. Workshop, 2022. [Online]. Avaiable: https://openreview.net/
+forum?id=wUU-7XTL5XO
+[9] J. X. Liu et al., “Grounding complex natural language commands for
+temporal tasks in unseen environments,” in Proc. 7th Annu. Conf. Robot
+Learn., 2023, pp. 1084–1110.
+[10] J. B. Tenenbaum et al., “How to grow a mind: Statistics, structure, and
+abstraction,” Science, vol. 331, no. 6022, pp. 1279–1285, 2011.
+[11] Y. Xie et al., “Decomposition enhances reasoning via self-evaluation
+guided decoding,” 2023, arXiv:2305.00633.
+[12] D. Keysers et al., “Measuring compositional generalization: A compre-
+hensive method on realistic data,” in Proc. Int. Conf. Learn. Repre-
+sentations, 2020. [Online]. Available: https://openreview.net/forum?id=
+SygcCnNKwr
+[13] X. Luo and C. Liu, “Simultaneous task allocation and planning for
+multi-robots under hierarchical temporal logic speciﬁcations,” IEEE
+Trans. Robot., early access, Aug. 12, 2025, doi: 10.1109/TRO.2025.
+3598139.
+[14] X. Luo, S. Xu, R. Liu, and C. Liu, “Decomposition-based hierarchical task
+allocation and planning for multi-robots under hierarchical temporal logic
+speciﬁcations,” IEEE Robot. Automat. Lett., vol. 9, no. 8, pp. 7182–7189,
+Aug. 2024.
+[15] Z. Wei et al., “Hierarchical temporal logic task and motion planning for
+multi-robot systems,” 2025, arXiv:2504.18899.
+[16] Y. Chen et al., “NL2TL: Transforming natural languages to temporal logics
+using large language models,” in Proc. 2023 Conf. Empirical Methods
+Natural Lang. Process., 2023, pp. 15880–15903.
+[17] M. Cosler et al., “nl2spec: Interactively translating unstructured natural
+language to temporal logics with large language models,” in Proc. Int.
+Conf. Comput. Aided Veriﬁcation, Springer, 2023, pp. 383–396.
+[18] D. Ghosh et al., “OCTO: An open-source generalist robot pol-
+icy,” in Proc. Robot.: Sci. Syst., Delft, Netherlands, Jul. 2024, doi:
+10.15607/RSS.2024.XX.090.
+[19] Y. Xie et al., “Translating natural language to planning goals with large-
+language models,” 2023, arXiv:2302.05128.
+[20] B. Liu et al., “LLM+P: Empowering large language models with optimal
+planning proﬁciency,” 2023, arXiv:2304.11477.
+[21] K. Valmeekam et al., “PlanBench: An extensible benchmark for evaluating
+large language models on planning and reasoning about change,” in Proc.
+Adv. Neural Inf. Process. Syst., 2024, vol. 36, pp. 38975–38987.
+[22] I. Singh et al., “PROGPROMPT: Program generation for situated robot
+task planning using large language models,” Auton. Robots, vol. 47, no. 8,
+pp. 999–1012, 2023.
+[23] J. Liang et al., “Code as policies: Language model programs for em-
+bodied control,” in Proc. 2023 IEEE Int. Conf. Robot. Automat., 2023,
+pp. 9493–9500.
+[24] W. Huang et al., “VoxPoser: Composable 3D value maps for robotic
+manipulation with language models,” in Proc. Conf. Robot Learn., 2023,
+pp. 540–562.
+[25] S. S. Kannan, V. L. N. Venkatesh, and B. -C. Min, “SMART-LLM: Smart
+multi-agent robot task planning using large language models,” in Proc.
+2024 IEEE/RSJ Int. Conf. Intell. Robots Syst., 2024, pp. 12140–12147.
+[26] G. Wang et al., “Voyager: An open-ended embodied agent with large
+language models,” Trans. Mach. Learn. Res., 2024. [Online]. Available:
+https://openreview.net/forum?id=ehfRiF0R3a
+[27] A. Brohan et al., “Do as i can, not as i say: Grounding language in robotic
+affordances,” in Proc. Conf. Robot Learn., 2023, pp. 287–318.
+[28] W. Huang et al., “Inner monologue: Embodied reasoning through planning
+with language models,” in Proc. Conf. Robot Learn., 2023, pp. 1769–1782.
+[29] A. Ren et al., “Robots that ask for help: Uncertainty alignment for large lan-
+guage model planners,” in Proc. 2nd Workshop Lang. Robot Learn.: Lang.
+Grounding, 2023. [Online]. Available: https://openreview.net/forum?id=
+AZyXafjzyt
+[30] S. Konrad et al., “Real-time speciﬁcation patterns,” in Proc. 27th Int. Conf.
+Softw. Eng., 2005, pp. 372–381.
+[31] F. Fuggitti et al., “NL2LTL–A python package for converting natural
+language (NL) instructions to linear temporal logic (LTL) formulas,” in
+Proc. AAAI Conf. Artif. Intell., 2023, vol. 37, no. 13, pp. 16428–16430.
+[32] J. Pan, G. Chou, and D. Berenson, “Data-efﬁcient learning of natural
+language to linear temporal logic translators for robot task speciﬁcation,”
+in Proc. 2023 IEEE Int. Conf. Robot. Automat., 2023, pp. 11554–11561.
+[33] R. Patel, R. Pavlick, and S. Tellex, “Learning to ground language to tem-
+poral logical form,” in Proc. Conf. North Amer. Chapter Assoc. Comput.
+Linguistics (NAACL), 2019.
+[34] J. X. Liu et al., “Lang2LTL: Translating natural language commands
+to temporal speciﬁcation with large language models,” in Workshop
+Lang. Robot. CoRL, 2022. [Online]. Available: https://openreview.net/
+forum?id=VxfjGZzrdn
+[35] J. Hsu, J. Mao, J. Tenenbaum, and J. Wu, “What’s left? Concept grounding
+withlogic-enhancedfoundationmodels,”inProc.Adv.NeuralInf.Process.
+Syst., 2024, vol. 36, pp. 38798–38814.
+[36] J. Wang et al., “Conformal temporal logic planning using large language
+models: Knowing when to do what and when to ask for help,” 2023,
+arXiv:2309.10092.
+[37] Z. Mandi, S. Jain, and S. Song, “ROCO: Dialectic multi-robot collabora-
+tion with large language models,” in Proc. 2024 IEEE Int. Conf. Robot.
+Automat., 2024, pp. 286–299.
+[38] A. Lykov et al., “LLM-Mars: Large language model for behavior tree
+generation and NLP-enhanced dialogue in multi-agent robot systems,”
+2023, arXiv:2312.09348.
+[39] Y. Chen, J. Arkin, Y. Zhang, N. Roy, and C. Fan, “Scalable multi-
+robot collaboration with large language models: Centralized or decen-
+tralized systems?,” in Proc. 2024 IEEE Int. Conf. Robot. Automat., 2024,
+pp. 4311–4317.
+[40] K. Garg et al., “Large language models to the rescue: Deadlock resolution
+in multi-robot systems,” 2024, arXiv:2404.06413.
+[41] J. Wang et al., “Safe task planning for language-instructed multi-robot
+systems using conformal prediction,” 2024, arXiv:2402.15368.
+[42] B. Yu et al., “Co-NAVGPT: Multi-robot cooperative visual semantic
+navigation using large language models,” 2023, arXiv:2310.07937.
+[43] C. Baier et al. Principles of Model Checking. Cambridge, MA, USA: MIT
+Press Cambridge, 2008.
+[44] O. Kupferman et al., “Model checking of safety properties,” Formal
+Methods Syst. Des., vol. 19, pp. 291–314, 2001.
+[45] F. Petroni et al., “Language models as knowledge bases?,” in Proc. 2019
+Conf. Empirical Methods Natural Lang. Process. 9th Int. Joint Conf.
+Natural Lang. Process., 2019, pp. 2463–2473.
+[46] A. Q. Jiang et al., “Mistral 7B,” 2023, arXiv:2310.06825.
+[47] E. Kolve et al., “AI2-THOR: An interactive 3D environment for visual
+AI,” 2017, arXiv:1712.05474.
+[48] M. Shridhar et al., “ALFRED: A benchmark for interpreting grounded
+instructions for everyday tasks,” in Proc. IEEE/CVF Conf. Comput. Vis.
+Pattern Recognit., 2020, pp. 10740–10749.
+[49] J. Achiam et al., “GPT-4 Technical report,” 2023, arXiv:2303.08774.
+[50] D. Mendoza, C. Hahn, and C. Trippel, “Translating natural language
+to temporal logics with large language models and model checkers,” in
+Proc. Conf. Formal Methods Comput.-Aided Des. 2024, pp. 1–11, doi:
+10.34727/2024/isbn.978-3-85448-065-5_17.
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on January 30,2026 at 19:14:06 UTC from IEEE Xplore.  Restrictions apply. 

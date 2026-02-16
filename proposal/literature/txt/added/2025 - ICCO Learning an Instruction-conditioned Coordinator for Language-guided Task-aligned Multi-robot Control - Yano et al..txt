@@ -1,0 +1,939 @@
+--- Page 1 ---
+ICCO: Learning an Instruction-conditioned Coordinator for
+Language-guided Task-aligned Multi-robot Control
+Yoshiki Yano1, Kazuki Shibata1, Maarten Kokshoorn1,2 and Takamitsu Matsubara1
+Abstract— Recent
+advances
+in
+Large
+Language
+Models
+(LLMs) have permitted the development of language-guided
+multi-robot systems, which allow robots to execute tasks based
+on natural language instructions. However, achieving effective
+coordination in distributed multi-agent environments remains
+challenging due to (1) misalignment between instructions and
+task requirements and (2) inconsistency in robot behaviors
+when they independently interpret ambiguous instructions. To
+address these challenges, we propose Instruction-Conditioned
+Coordinator (ICCO), a Multi-Agent Reinforcement Learn-
+ing (MARL) framework designed to enhance coordination
+in language-guided multi-robot systems. ICCO consists of a
+Coordinator agent and multiple Local Agents, where the Co-
+ordinator generates Task-Aligned and Consistent Instructions
+(TACI) by integrating language instructions with environmental
+states, ensuring task alignment and behavioral consistency.
+The Coordinator and Local Agents are jointly trained to
+optimize a reward function that balances task efﬁciency and
+instruction following. A Consistency Enhancement Term is
+added to the learning objective to maximize mutual information
+between instructions and robot behaviors, further improving
+coordination. Simulation and real-world experiments validate
+the effectiveness of ICCO in achieving language-guided task-
+aligned multi-robot control. The demonstration can be found
+at https://yanoyoshiki.github.io/ICCO/.
+I. INTRODUCTION
+With the emergence of Large Language Models (LLMs)
+[1], their language understanding and representation capa-
+bilities have attracted attention for application to language-
+guided robot control. Most studies of language-guided robot
+control [2]–[4] have implicitly assumed that language in-
+structions are consistent with task objectives. However, such
+assumptions may be problematic in dynamic environments
+(e.g., manipulation tasks where objects are dynamically
+relocated or navigation tasks where pedestrians traverse the
+robot’s planned path). Addressing this challenge requires
+enhanced task-aligned autonomy, allowing robots to inter-
+pret and adapt instructions while balancing real-world task
+requirements and instruction following. This is particularly
+crucial in distributed multi-robot systems, where multiple
+robots operate under decentralized control while relying on
+local observations to execute a number of complex tasks,
+such as cooperative transportation [5]–[7], navigation [8]–
+[11], and SLAM [12]–[14]. Accordingly, this study focuses
+on language-guided multi-robot control in dynamic environ-
+ments.
+1 All the authors are with the Division of Information Science, Graduate
+School of Science and Technology, Nara Institute of Science and Technology
+(NAIST), Nara, Japan.
+2 M. Kokshoorn is with the Department of Cognitive Robotics, Faculty
+of Mechanical Engineering, Delft University of Technology, Delft, Nether-
+lands.
+Fig. 1.
+Overview of language-guided task-aligned multi-robot control in
+the resource collection task. This ﬁgure illustrates how multiple robots
+coordinate their actions based on language-guided instructions while bal-
+ancing resource collection and defense against invaders. Robots that are far
+from invaders or resources follow an instruction (e.g., “Move to Center”)
+immediately, while those actively engaged in the task complete their current
+objective before complying ﬂexibly.
+Concretely, translating language instructions into coordi-
+nated multi-robot behaviors poses two key challenges:
+1) Misalignment between instructions and task require-
+ments: Language instructions may not fully capture the
+speciﬁc requirements of the given task or may even
+contradict them, leading to execution discrepancies.
+2) Inconsistency between instructions and robot behaviors.
+Ambiguous instructions interpreted solely through the
+local observations of each robot may lead to conﬂicting
+actions among robots, disrupting team coordination.
+Here, for example, we consider a resource collection task
+in which multiple robots cooperate to collect resources while
+defending against invaders (Fig. 1), following a simulation
+task in a previous work [15]. The environment is dynamic
+because the invaders and resources are randomly located
+and the invaders move toward the center in launching their
+invasion. The task requirements consist of two objectives: de-
+fending against the invaders and collecting resources. When
+the instructor gives an abstract instruction such as “Move
+to Center,” robots that do not detect any nearby invaders
+or resources should follow this instruction immediately. On
+the other hand, a robot that is close to an invader or a
+resource is expected to complete its respective task ﬂexibly
+before following the instruction. However, achieving these
+objectives is not straightforward. If each robot independently
+interprets the instruction and task alignment based solely
+on its own local observations, inconsistencies in behaviors
+may arise, possibly leading to inefﬁcient coordination and
+inappropriate task execution.
+Prior work on LLM-integrated Multi-Agent Reinforcement
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2025)
+October 19-25, 2025. Hangzhou, China
+979-8-3315-4393-8/25/$31.00 ©2025 IEEE
+18700
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) | 979-8-3315-4393-8/25/$31.00 ©2025 IEEE | DOI: 10.1109/IROS60139.2025.11247312
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 2 ---
+Learning (MARL) has explored methods for interpreting
+and executing language instructions by distributed agents
+[16]; however, those methods require extensive inter-robot
+communication, limiting applicability. Another approach as-
+signs individual instructions to each agent [17], placing a
+heavy burden on the instructor. To address these issues,
+this paper explores an alternative framework that enables
+both language-instruction following and cooperative task
+execution without relying on inter-agent communication or
+excessive instructor effort. Since task coordination and con-
+sistency require a global perspective, centralized instruction
+coordination appears to be a reasonable approach.
+This paper proposes Instruction-Conditioned Coordina-
+tor (ICCO), a MARL framework that balances language-
+instruction following and cooperative task execution. As
+shown in Fig. 2, ICCO comprises a Coordinator, which
+generates and distributes Task-Aligned and Consistent In-
+structions (TACI) based on language instructions and global
+environment observations, thus ensuring task alignment and
+behavioral consistency, and Local Agents, which determine
+actions using local observations and TACI. ICCO follows the
+Centralized Training with Decentralized Execution (CTDE)
+paradigm, jointly optimizing the Coordinator and Local
+Agent policies to balance instruction following and task
+requirements. A Consistency Enhancing (CE) Term is in-
+troduced in the learning objectives to maximize the lower
+bound of mutual information between instructions and agent
+behaviors, improving coordination consistency.
+Inspired by a MARL study that enhanced coordination
+among multiple robots by distributing global messages [15],
+our approach uses one-way broadcast communication, elim-
+inating inter-agent communication and simplifying system
+conﬁguration. It also reduces the instructor’s burden by
+removing the need to assign instructions to each agent
+manually.
+The contributions of this study are as follows:
+• We propose ICCO, a MARL framework that balances
+language-instruction following and cooperative task ex-
+ecution without relying on inter-agent communication
+or increasing instructor burden.
+• We validate the effectiveness of the proposed method
+through simulation experiments in a language-instructed
+environment.
+• We conﬁrm the effectiveness of the proposed method
+by conducting real-world demonstrations using physical
+robots.
+II. RELATED WORKS
+A. Multi-robot control using LLMs
+In recent years, multi-robot control using LLMs has at-
+tracted attention in its application to various tasks, including
+cooperative pick-and-place tasks [18], [19], home service
+tasks [20]–[22], cooperative navigation [23], [24], and for-
+mation tasks [16], [17]. Furthermore, several recent studies
+[18], [19], [21] have proposed decentralized approaches in
+which each agent is equipped with its own LLM and controls
+itself based on task-planning via interactive dialogues.
+However, dialogue-based approaches [18], [19], [21] suffer
+from increased LLM inference times as tasks progress, lead-
+ing to prolonged decision-making latency. In contrast, our
+study employs MARL policies for agent decision-making to
+prevent triggering of LLM inference during action selection,
+which permits multi-robot control without delays.
+B. Multi-robot control using LLMs and MARL
+Several recent studies [16], [17] have integrated LLMs
+with MARL frameworks [25], [26] to achieve both language-
+instruction following and successful task execution. Liu et al.
+[16] proposed a MARL approach that achieves compliance
+with language instructions and task execution through inter-
+agent communication. However, this method necessitates
+extensive communication among agents, thus limiting its
+applicability. Morad et al. [17] introduced another MARL
+approach in which an instructor provides speciﬁc instructions
+to each agent individually. However, this approach is imprac-
+tical for real-world applications due to the high cognitive
+burden placed on the instructor.
+This study differs from those approaches [16], [17] in that
+it introduces a Coordinator that concurrently facilitates both
+language instructions and coordinated behavior. In addition,
+it incorporates the mutual information between instructions
+and agent behaviors, thus improving coordination consis-
+tency. Consequently, our method can balance instruction
+following and cooperative task execution without requiring
+inter-agent communication or individual instructions given to
+each agent.
+III. PRELIMINARY
+A. Decentralized Partially Observable Markov Decision
+Process (Dec-POMDP)
+This study formulates the multi-robot control prob-
+lem
+as
+a
+Dec-POMDP
+[27].
+We
+deﬁne
+the
+tuple
+⟨S, B, {Ai}i∈B, P, r, {Oi}i∈B, γ⟩, where s ∈S denotes the
+global state of the environment. At each time step t, each
+agent i ∈B := {1, · · · , n} receives a local observation oi ∈
+Oi and selects an action ai ∈Ai. This yields a joint action
+a ∈A = Qn
+i=1 Ai. Subsequently, the environment transi-
+tions from the current state s to a new state s′ according to
+the state transition function P(s′|s, a) : S × A × S →[0, 1],
+providing the agents with a global reward r(s, a). Given a
+joint policy π := (πi)i∈B, the joint action-value function
+at time t is deﬁned as Qπ(st, at) = E [Rt|st, at], where
+Rt = E
+P∞
+k=0 γkrt+k
+
+denotes the discounted cumulative
+reward and 0 ≤γ < 1 is a discount factor. The objective of
+this study is to ﬁnd a policy that achieves the optimal value
+Q∗= maxπ Qπ(st, at).
+B. QMIX
+QMIX [28] is one of the typical MARL algorithms that
+adopt the CTDE paradigm. During training, it leverages
+the global state to learn the joint action-value function;
+during execution, each agent selects actions based on its
+own policy, using only local observations. QMIX employs a
+factorization approach, where the joint action-value function
+18701
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 3 ---
+Qtot is decomposed as a combination of the local action-
+value functions of individual agents, given by
+Qtot
+θ (s, a) = f(Q1(o1, a1), ..., Qn(on, an); s),
+(1)
+where
+∂f
+∂Qi ≥0, ∀i ∈B, and θ is the weight parameter of
+the Qtot network.
+The mixing network f is a monotonically increasing
+function that takes the action values of individual agents as
+inputs. Consequently, maximizing each agent’s local action
+value leads to the maximization of the joint action value. The
+joint action-value function is trained based on the Bellman
+equation Qtot(st, at) = E
+h
+rt + γ maxa′ Qtot(s′, a′)
+i
+. To
+optimize the action-value function, the loss function
+LRL(θ) = E(τt,at,rt)∼D
+h rt+
+γ max
+a′ Qtot
+θ−(τt+1, a′) −Qtot
+θ (τt, at, st)
+2i
+(2)
+is minimized, where θ−represents the weight parameters of
+the target network for Qtot. Additionally, the trajectory set is
+deﬁned as τ =
+
+τ i | i ∈B
+	
+, where each agent’s trajectory
+is given by τ i =
+ oi
+0, ai
+0, . . . oi
+t
+
+.
+IV. PROPOSED METHOD
+A. Overview of ICCO framework
+In this section, we describe ICCO, a MARL framework
+designed to balance language-instruction following with task
+execution. An overview of the proposed framework is pre-
+sented in Fig. 2. ICCO primarily comprises a Coordinator
+and a group of Local Agents.
+The Coordinator employs an LLM to convert language
+instructions from the Instructor into agent-speciﬁc vector
+representations. Subsequently, the coordination policy inte-
+grates these vectors with the global state st to generate Task-
+Aligned and Consistent Instructions (TACI) for each agent,
+denoted by zt := (z1
+t , · · · , zn
+t ). Agent i selects its action
+based on the local observation and the instruction according
+to its local policy. The coordination policy and local policies
+are consistently trained within the CTDE framework to max-
+imize a reward function that balances instruction following
+and task achievement.
+Furthermore, to efﬁciently learn policies while accommo-
+dating diverse language instructions, we adopt the Training
+without LLM and Execution with LLM approach, where
+policies are trained without an LLM, which is used only
+during execution.
+B. Policy model
+MARL using LLMs [16] leverages inter-agent commu-
+nication and adopts a distributed policy under the local
+observation. However, in the absence of inter-agent commu-
+nication, it is challenging to achieve both compliance with
+language instructions and successful task execution using
+only local policies.
+Fig. 2.
+Block diagram illustrating ICCO framework: Instruction-
+Conditioned Coordinator using Language Instruction
+To address this issue, ICCO introduces a coordination
+policy that computes TACI zt given by
+{µt, Σt} = gϕ(st, vt),
+(3)
+zt ∼N(µt, Σt),
+(4)
+where ϕ represents the parameters of the function g, N
+denotes a normal distribution, and µ and Σ are the mean
+and covariance, respectively.
+Furthermore, the local agent has one local policy that
+computes the action by ai
+t = argmaxai
+t Qi(τ i
+t, ai
+t|zi
+t), where
+the action ai
+t is selected to maximize the local action-value
+function Qi based on the local observation oi
+t and individual
+TACI zi
+t. Following QMIX, this function is modeled by the
+joint action-value function Qtot
+θ
+as in Eq. (1).
+C. Training objectives
+The training objective is to ensure that agents follow
+language instructions while accomplishing the task. When
+instructions align with task requirements, the objective func-
+tion is maximized to train agents to follow the instruc-
+tions. However, when misalignment occurs, the instructions
+must be adjusted to balance instruction following and task
+execution. Additionally, due to partial observability, local
+agents may select different actions even when given the
+same instructions, necessitating better consistency in robot
+behavior. To address these challenges, the objective function
+promotes both the alignment between task requirements and
+instructions and the consistency of multi-robot behaviors.
+Task-Alignment Term: To promote task alignment, we
+introduce task achievement and instruction following in the
+reward function, formulating the task-alignment term using
+(2) as follows:
+LRL(θ, ϕ) = E(τt,at,rt,st,s′)∼D [(rt+
+γ max
+a′ Qtot
+θ−(τt+1, a′ | zt+1) −Qtot
+θ
+(τt, at | zt)
+2
+, (5)
+where Qtot
+θ
+and Qtot
+θ−are conditioned on zt and zt+1,
+respectively.
+18702
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 4 ---
+Consistency Enhancing Term: To promote consistency
+between instructions and multi-robot behaviors, we consider
+the mutual information term, given by
+I (zt; ζt, st, vt) = DKL
+ p(zt | ζt, st, vt)
+ p(zt | st, vt)
+
+,
+(6)
+where ζt = (ot+1, at+1, . . . , ot+T −1, at+T −1) represents
+the observation-action trajectory from step t+1 to t+T −1.
+Since the future observation-action trajectory ζt is high-
+dimensional and varies stochastically, computing the poste-
+rior distribution p(zt | ζt, st, vt) is intractable. To address
+this, we introduce an approximate posterior distribution
+qξ(zt | ζt, st, vt) in a factorized form [29] as follows:
+qξ (zt | ζt, st, vt) ∝q(t)
+ξ
+(zt | st, at, vt)
+t+T −1
+Y
+k=t+1
+q(k)
+ξ
+(zt | ok, ak, vk) .
+(7)
+Using (7), the lower bound of I (zt; ζt, st, vt) can be
+derived using variational inference [15] as follows:
+I (zt; ζt, st, vt) ≥Est,zt,ζt,vt [log qξ (zt | ζt, st, vt)]
++H (zt | st, vt) ,
+(8)
+where H denotes entropy. Using (8), we introduce the
+consistency-enhancing term as follows:
+LCE(ϕ, ξ) = −Est,zt,ζt,vt
+h
+log qξ (zt | ζt, st, vt)
+i
+−H (zt | st, vt) .
+(9)
+During the training phase, the network parameters (θ, ϕ, ξ)
+are updated by minimizing LRL + LCE.
+D. Training without LLM and execution with LLM
+In MARL with LLMs [17], using training policies for
+diverse language expressions that are not intrinsic to the
+task results in extended training durations. Moreover, using
+LLMs during training necessitates repeated inference within
+the training loop, leading to a substantial increase in com-
+putational cost.
+To address this issue, we adopt a training approach where
+policies are learned without LLMs during training but then
+executed with LLMs, which are adopted only during this
+latter phase following the method proposed previously [16].
+Speciﬁcally, during the training phase, policies are trained
+by random sampling within the expected instruction vector
+space without using an LLM. Each instruction vector is
+generated as a smooth trajectory by sampling Gaussian noise
+ϵk at each time step k and computing the cumulative sum
+from the agent’s current position, given by vt+k = pt +
+PK
+k=1 ϵk. During the execution phase, the LLM converts
+diverse language instructions into instruction vectors for each
+agent. These vectors are clipped within a predeﬁned value
+to ensure that agents stay within the movable region, and to
+prevent the LLM outputs from becoming out-of-distribution
+relative to the training data. This approach reduces training
+time, compared to methods that incorporate LLMs during
+training, while still maintaining the capability to handle
+various language instructions.
+V. EXPERIMENT
+In this section, we validate the effectiveness of the pro-
+posed method through simulations and multi-robot experi-
+ments that involve both instruction following and task exe-
+cution. The key research questions in this experiment are as
+follows:
+• Can the policy learned by ICCO balance instruction
+following and task execution? (V-B)
+• Can ICCO perform effectively with natural language
+instructions using an LLM? (V-C)
+• Can the Coordinator in ICCO be replaced by an LLM
+with task-aligned prompt engineering? (V-D)
+In the following experiments, training and evaluation were
+conducted in simulation, while a demonstration of the trained
+policies was performed in a real environment.
+A. Experimental setup
+1) Simulation Setup: The simulation environment used
+in this study is based on the resource collection environment
+from [15], but it is adjusted to our real environment, as shown
+in Fig. 3. The environment contains three homogeneous
+agents, an invader, and six resources, whose initial positions
+are randomly generated within a 6.5 × 6.5 m area. Note
+that when an agent picks up a resource, a new resource is
+spawned. An agent can transport a resource upon contact.
+The task objective is that Agents collect resources and
+transport them to the home base while preventing an invader
+from reaching it.
+Each agent can observe only other agents, resources, the
+invader and the home within a circle of radius 0.65 m. The
+instruction vector vt consists of the instruction vectors for
+all agents, where each agent’s instruction is speciﬁed by
+waypoints. The global state provided to the coordination
+policy includes the positions and velocities of all agents,
+binary ﬂags indicating whether they are carrying resources or
+defending invaders, the positions of environmental elements
+such as resources and invaders, and instruction vectors gen-
+erated by the LLM for all agents.
+The agent’s reward is given by r = rtask + rinst, where
+rtask and rinst represent the task and instruction-following
+rewards, respectively. The task reward is given by rtask =
+rpick + rcollect + rdefense, where rpick = 5 for picking a
+resource, rcollect = 1 for releasing it at home, rdefense =
+4 for hitting an invader, and rdefense = −4 if the invader
+reaches home. The instruction-following reward is given by
+rinst = 1.3(ecossim + 0.1edist), where ecossim is the cosine
+similarity between two displacement vectors: one from the
+agent’s current position to the next position and one from the
+nearest waypoint to the second-nearest waypoint, and edist
+is the distance between the agent’s current position and the
+nearest waypoint.
+2) Prompt Setup: The key components of the prompt are
+shown in Fig. 4. To conﬁgure the spatial setting, the LLM
+is anchored to a 2D ﬁeld. Empirical observations indicate
+that this enables the LLM to interpret “up” as the positive
+y-axis direction and “right” as the positive x-axis direction
+18703
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 5 ---
+Fig. 3.
+Resource Collection Environment
+# Configuration of the spatial setting
+You are a masterful multi-agent commander, expertly trained in coordinating 
+3 agents across 2D environments with precision and strategic intelligence.
+Instructions: 
+"Generate movement paths for agents from their starting positions to 4 target 
+points between far final target point.
+675,&7/<&203/<ZLWKWKHIROORZLQJRUGHU³^RUGHU`
+Initial Configurations:
+- Agent 0: {agent1_position}
+- Agent 1: {agent2_position}
+- Agent 2: {agent3_position}
+# Few step instruction
+EXECUTION REQUIREMENTS:
+1. Task 1 - Movement Strategy:
+- Define precise directional control pattern for each agent
+- Specify exact angular progression
+- Ensure continuous motion in commanded direction
+2. Task 2 - Trajectory Generation:
+- Calculate 4 precise waypoints maintaining directional constraint
+- Ensure smooth transitions between points
+- Verify directional compliance at each step
+Output:
+"task1":
+"agent_0": "description", "agent_1": "description", "agent_2": "description",
+"task2":
+"agent_0": [[initial_x, initial_y], [x_t1, y_t1], ..., [x_t4, y_t4]],
+"agent_1": [[initial_x, initial_y], [x_t1, y_t1], ..., [x_t4, y_t4]],
+"agent_2": [[initial_x, initial_y], [x_t1, y_t1], ..., [x_t4, y_t4]]
+Fig. 4.
+Key components of the prompt for the ICCO’s LLM: Elements
+enclosed in {} represent variables that are updated when inputted to the
+LLM.
+without requiring additional speciﬁcations in the prompt. The
+inputs to the LLM consist of language instructions and initial
+conﬁgurations, while the output comprises waypoints for
+each agent. In the instruction part, the phrase “STRICTLY
+COMPLY with the following order” ensures strict following
+of the given instruction. Furthermore, to generate stable tra-
+jectories, we adopt a few-step instruction approach following
+previous works [30], [31], where the trajectory is generated
+in two stages. Speciﬁcally, in the Movement Strategy stage,
+the LLM explains the trajectory based on the given in-
+structions, and in the Trajectory Generation stage, it outputs
+the waypoints for each agent. Since this study focuses on
+handling task-misaligned language instructions, task-related
+information is omitted from the prompt for simplicity. The
+experiment was conducted by feeding these prompts into
+GPT 4o [32].
+3) Baselines: To evaluate the effectiveness of the pro-
+posed method (ICCO), comparisons were made with the
+following baseline approaches.
+• QMIX [28]: To evaluate the effectiveness of the coordi-
+nation policy, we compared our approach with a QMIX-
+based method using policies conditioned on language
+instructions and individual agent observations, without
+inter-agent communication.
+• QMIX (FULL): Similar to QMIX, but this method
+allows each agent to access the global state.
+• ICCO w/o CE: To conﬁrm the effectiveness of the CE
+term in the proposed method, we conducted an ablation
+study comparing ICCO without the LCE(ϕ, ξ) used in
+Eq. (9).
+QMIX and ICCO adopt the same architecture as [28] and
+[15], except for differences in input dimensionality resulting
+from the presence of instruction vectors.
+All methods were trained in the following settings: Agents,
+Invaders, and Resources are sampled uniformly in the ﬁeld’s
+range for each episode, which consists of 145 steps. Instruc-
+tion vectors are generated every four steps using a zero-mean
+Gaussian distribution from the agent’s current position to
+promote a smooth trajectory.
+4) Real robot system: We demonstrated use of a real
+robot Go1-M, which is a Unitree Go1 with a muzzle based
+on the OpenManipulator-X gripper. A motion capture system
+observed the positions of Go1-M, the resources, and the in-
+vader. Due to differences in locomotion mechanisms between
+Go1-M and the simulation agents, real-world transitions were
+computed from policy outputs, with position control using
+the Dynamic Window Approach (DWA) [33]. A pre-designed
+controller was used for the catch-and-release action required
+for resource picking and collection.
+B. Evaluation of instruction following and task execution
+The performances of the policies learned by all methods
+were evaluated in terms of reward values. For the evaluation,
+the ﬁeld was divided into four quadrants. Within each quad-
+rant, 145 steps were processed using a smooth instruction
+vector within the quadrant, generated using a zero-mean
+Gaussian distribution from the current agent position. The
+target quadrants were sequentially transitioned from the ﬁrst
+to the fourth quadrant, resulting in 580 steps per episode.
+Each evaluation consisted of 20 trials.
+Fig. 5 shows the detailed results for the ﬁrst quadrant
+with all four methods. In QMIX and QMIX (FULL), agents
+moved within the designated quadrant but failed to transport
+resources to home or defend against invaders. Similarly,
+ICCO w/o CE did not effectively achieve resource collection
+or defense against invaders. In contrast, ICCO approximately
+controlled agents within the quadrant while enabling them
+to achieve both resource collection and invader defense,
+indicating that the CE term improved alignment between in-
+struction following and agent behavior. Consequently, ICCO
+achieved the highest reward among the evaluated methods.
+The rewards of the learned policies are summarized in Fig.
+6(a).
+Overall, the proposed method demonstrated superior in-
+struction following and task execution compared to the
+baseline methods.
+18704
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 6 ---
+Fig. 5.
+Agent trajectories with instruction vectors generated in the red-
+shaded quadrant. ICCO is the only approach that successfully achieved
+resource collection and invader defense while approximately controlling
+agents in the designated quadrant, whereas others failed to perform these
+tasks.
+C. Effectiveness of ICCO with natural language instructions
+and LLM
+We validated the proposed method by generating instruc-
+tion vectors using an LLM. Fig. 7 shows a demonstration
+from the simulation experiments in Subsection V-B, where
+the trained policy was tested with different language instruc-
+tions as listed in Table I.
+In the “Gather Center” task, where instruction following
+aligns with task execution, ICCO outperformed QMIX
+(FULL) by gathering agents closer to the center while col-
+lecting more resources and defending against more invaders.
+In the remaining tasks, where misalignment exists between
+instruction following and task execution, QMIX (FULL)
+successfully followed the instructions but largely failed in re-
+source collection and invader defense. In contrast, ICCO was
+less effective in resource collection but successfully defended
+against invaders. Fig. 6(b) shows the rewards obtained over
+20 trials for each method across four different instructions.
+The results indicate that ICCO achieved higher rewards than
+the baseline methods. Additionally, Fig. 8 presents real-robot
+demonstrations using the trained policies, where the language
+instruction “Go right” was provided. The results of the real-
+robot experiments show similar outcomes to those observed
+in the simulation. See the attached video for more details on
+the real-robot experiments.
+In summary, the proposed method can effectively operate
+with natural language instructions using an LLM.
+D. Can the Coordinator in ICCO be replaced by an LLM
+with task-aligned prompt engineering?
+Setup: In this experiment, we further investigated the
+effectiveness of ICCO by comparing it to an approach that
+employs task-aligned prompts as a complementary method
+(a)
+(b)
+Fig. 6.
+Comparison of rewards: (a) rewards from an experiment using
+reference trajectories as instructions every 4 steps in four quadrants; (b)
+rewards from an experiment using four natural language instructions via
+LLMs, given every 145 steps. Each time a language instruction was given,
+the prompt was re-fed to the LLM. Each experiment was conducted for 145
+continuous steps per quadrant and language instruction.
+TABLE I
+LANGUAGE INSTRUCTIONS
+Instruction
+Instruction Details
+Go Right
+The agents need to form a line formation on the right
+side.
+Move Top
+The agents need to form a line formation at the top.
+Gather Center
+The agents need to gather at the (0,0) position.
+Spread Out
+The agents must spread out from the center.
+instead of using a Coordinator. Since the previous two
+experiments conﬁrmed instruction following, this experiment
+focused on evaluating task performance. We compared our
+method with the following methods:
+• QMIX with Task-Aligned Prompt (QMIX-TAP): A
+method that combines QMIX with an LLM using task-
+aligned prompts.
+• QMIX-TAP without task reward (QMIX-TAP w/o
+TR): A method based on QMIX-TAP, excluding the
+task reward (TR).
+These methods commonly used a task-aligned prompt that
+includes resources, invaders, and task rewards. See Appendix
+for further details on the prompt.
+Results: Table II presents a comparison of the number
+of resource picks, collections, and invader defenses. QMIX-
+TAP outperformed QMIX-TAP w/o TR across all metrics.
+This result suggests that even when task rewards are provided
+to the LLM, incorporating task rewards into local RL agents
+further contributes to task performance. Furthermore, ICCO
+outperformed all other methods in every metric, suggesting
+that the Coordinator was more effective than an LLM with
+task-aligned prompt engineering.
+In summary, the Coordinator in ICCO cannot be replaced
+by an LLM with task-aligned prompt engineering.
+VI. DISCUSSION
+In this study, we conducted a real-robot demonstration on a
+simple task of resource collection. However, when applied to
+more complex tasks, such as cooperative transport, a policy
+trained in simulation may perform worse in the real world.
+To address this issue, the robustness of the trained policy
+18705
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 7 ---
+Fig. 7.
+Agent trajectories for four different language instructions. In “Gather Center,” where instruction following aligns with task execution, ICCO
+outperformed QMIX (FULL) in gathering agents, collecting resources, and defending against invaders. In other tasks, QMIX (FULL) followed instructions
+but failed in resource collection and defense, while ICCO was less effective in resource collection but successfully defended against invaders.
+(a) QMIX-FULL
+(b) ICCO
+Fig. 8.
+Real-robot demonstrations
+TABLE II
+COMPARISON OF THE NUMBERS OF PICKS, COLLECTIONS, AND
+INVADER DEFENSES OVER 20 TRIALS
+Method
+Pick
+Collect
+Defense
+QMIX-TAP
+5.1 ± 1.5
+3.0 ± 1.6
+6.8 ± 3.2
+QMIX-TAP w/o TR
+3.0 ± 1.1
+1.1 ± 0.7
+2.0 ± 1.7
+ICCO
+5.6 ± 2.2
+3.7 ± 1.8
+10.5 ± 2.9
+should be enhanced using domain randomization [34] and
+its performance should be quantitatively evaluated.
+In the current work, the language instruction task was
+limited to 2D tasks such as resource collection, with training
+conducted by randomly sampling instruction vectors without
+using an LLM. To extend the method to a broader range of
+tasks, further improvements are needed in converting natural
+language into numerical representations.
+VII. CONCLUSION
+This paper proposed ICCO, a MARL framework that
+balances language-instruction following and cooperative task
+execution. ICCO consists of a Coordinator, which generates
+TACI from language inputs and global observations. The
+coordination and local policies are consistently trained within
+the CTDE framework to balance instruction following and
+task requirements. Experiments show that ICCO outperforms
+baseline methods in balancing instruction following and
+task execution. It also effectively handles natural language
+instructions with an LLM. Notably, the Coordinator cannot
+be replaced by an LLM with prompt engineering, highlight-
+ing the limitations of relying solely on prompts for task
+execution. As future work, we aim to develop a general
+approach for converting natural language into numerical
+representations and to evaluate this approach on more chal-
+lenging tasks, including cooperative manipulation.
+APPENDIX
+This appendix describes the prompt used in Subsection V-
+D. Since some elements overlap with those in Fig. 4, Fig.
+9 highlights the additional components for the task-aligned
+prompt. The task-aligned prompt includes resource collection
+and invader defense as task details, rewards identical to those
+used in ICCO, and the initial conﬁgurations that specify the
+positions of all agents, resources, and the invader.
+REFERENCES
+[1] A. Hurst, A. Lerer, A. P. Goucher, A. Perelman, A. Ramesh, A. Clark,
+A. Ostrow, A. Welihinda, A. Hayes, A. Radford et al., “Gpt-4o system
+card,” arXiv preprint arXiv:2410.21276, 2024.
+18706
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 
+
+
+--- Page 8 ---
+Resource collection task notation:
+- Agent need to collect each resources
+- Agent need to collision to invader
+- Resource collection actions must not interfere with ongoing interception tasks
+- Invader interception paths should not block resource collection routes
+- Agent positions should optimize coverage of potential invader spawn points
+- Real-time response to invader detection is required
+Reward Setting
+- Resource collection: +{collection value} reward
+- Successful invader interception: +{defense value} reward
+- Invader reaching collection area: -{attack value} reward
+- Agent collision with resources: +{collision value} reward
+Initial Configurations:
+- Agent 0: {agent1_position}
+- Agent 1: {agent2_position}
+- Agent 2: {agent3_position}
+- Resource 0: {resoruce0_position}
+- Resource 1: {resoruce1_position}
+- Resource 2: {resoruce2_position}
+- Resource 3: {resoruce3_position}
+- Resource 4: {resoruce4_position}
+- Resource 5: {resoruce5_position}
+- Invader: {invader_position}
+Fig. 9.
+Key components of the task-aligned prompt: Elements enclosed
+in {} represent variables that are updated when inputted to the LLM. All
+resource and invader rows provide position information.
+[2] Y. Ding, X. Zhang, C. Paxton, and S. Zhang, “Task and motion
+planning with large language models for object rearrangement,” in
+2023 IEEE/RSJ International Conference on Intelligent Robots and
+Systems (IROS), 2023, pp. 2086–2092.
+[3] K. Chu, X. Zhao, C. Weber, M. Li, W. Lu, and S. Wermter, “Large lan-
+guage models for orchestrating bimanual robots,” in 2024 IEEE-RAS
+23rd International Conference on Humanoid Robots (Humanoids),
+2024, pp. 328–334.
+[4] J.-C. Pang, S.-H. Yang, K. Li, J. Zhang, X.-H. Chen, N. Tang,
+and Y. Yu, “KALM: Knowledgeable agents by ofﬂine reinforcement
+learning from large language model rollouts,” in The Thirty-eighth
+Annual Conference on Neural Information Processing Systems, 2024.
+[5] Z. Wang and M. Schwager, “Kinematic multi-robot manipulation with
+no communication using force feedback,” in 2016 IEEE International
+Conference on Robotics and Automation (ICRA), 2016, pp. 427–432.
+[6] P. Culbertson and M. Schwager, “Decentralized adaptive control for
+collaborative manipulation,” in 2018 IEEE International Conference
+on Robotics and Automation (ICRA), 2018, pp. 278–285.
+[7] I.-S. Bernard-Tiong, Y. Tsurumine, R. Sota, K. Shibata, and T. Mat-
+subara, “Cooperative grasping and transportation using multi-agent
+reinforcement learning with ternary force representation,” in 2025
+IEEE/SICE International Symposium on System Integration (SII),
+2025, pp. 973–978.
+[8] Y. Zhai, B. Ding, X. Liu, H. Jia, Y. Zhao, and J. Luo, “Decentralized
+multi-robot collision avoidance in complex scenarios with selective
+communication,” IEEE Robotics and Automation Letters, vol. 6, no. 4,
+pp. 8379–8386, 2021.
+[9] R. Han, S. Chen, S. Wang, Z. Zhang, R. Gao, Q. Hao, and J. Pan, “Re-
+inforcement learned distributed multi-robot navigation with reciprocal
+velocity obstacle shaped rewards,” IEEE Robotics and Automation
+Letters, vol. 7, no. 3, pp. 5896–5903, 2022.
+[10] W. Wang, L. Mao, R. Wang, and B.-C. Min, “Multi-robot cooperative
+socially-aware navigation using multi-agent reinforcement learning,”
+in 2024 IEEE International Conference on Robotics and Automation
+(ICRA), 2024, pp. 12 353–12 360.
+[11] S. H. Arul, A. Singh Bedi, and D. Manocha, “When, what, and with
+whom to communicate: Enhancing RL-based multi-robot navigation
+through selective communication,” in 2024 IEEE/RSJ International
+Conference on Intelligent Robots and Systems (IROS), 2024, pp. 7695–
+7695.
+[12] R. Dubé, A. Gawel, H. Sommer, J. Nieto, R. Siegwart, and C. Cadena,
+“An online multi-robot SLAM system for 3D LiDARs,” in IEEE/RSJ
+International Conference on Intelligent Robots and Systems, 2017, pp.
+1004–1011.
+[13] Y. Chang, Y. Tian, J. P. How, and L. Carlone, “Kimera-multi: a system
+for distributed multi-robot metric-semantic simultaneous localization
+and mapping,” in 2021 IEEE International Conference on Robotics
+and Automation (ICRA), 2021, pp. 11 210–11 218.
+[14] Y. Tian, Y. Chang, L. Quang, A. Schang, C. Nieto-Granda, J. P.
+How, and L. Carlone, “Resilient and distributed multi-robot visual
+SLAM: Datasets, experiments, and lessons learned,” in 2023 IEEE/RSJ
+International Conference on Intelligent Robots and Systems (IROS),
+2023, pp. 11 027–11 034.
+[15] B. Liu, Q. Liu, P. Stone, A. Garg, Y. Zhu, and A. Anandkumar,
+“Coach-player multi-agent reinforcement learning for dynamic team
+composition,” in International Conference on Machine Learning,
+2021, pp. 6860–6870.
+[16] H.-S. Liu, S. Kuroki, T. Kozuno, W.-F. Sun, and C.-Y. Lee, “Language-
+guided pattern formation for swarm robotics with multi-agent rein-
+forcement learning,” in 2024 IEEE/RSJ International Conference on
+Intelligent Robots and Systems (IROS), 2024, pp. 8998–9005.
+[17] S. Morad, A. Shankar, J. Blumenkamp, and A. Prorok, “Language-
+conditioned ofﬂine RL for multi-robot navigation,” arXiv preprint
+arXiv:2407.20164, 2024.
+[18] Z. Mandi, S. Jain, and S. Song, “Roco: Dialectic multi-robot col-
+laboration with large language models,” in 2024 IEEE International
+Conference on Robotics and Automation (ICRA), 2024, pp. 286–299.
+[19] Y. Chen, J. Arkin, Y. Zhang, N. Roy, and C. Fan, “Scalable multi-robot
+collaboration with large language models: Centralized or decentralized
+systems?” in 2024 IEEE International Conference on Robotics and
+Automation (ICRA), 2024, pp. 4311–4317.
+[20] S. S. Kannan, V. L. Venkatesh, and B.-C. Min, “Smart-llm: Smart
+multi-agent robot task planning using large language models,” in 2024
+IEEE/RSJ International Conference on Intelligent Robots and Systems
+(IROS), 2024, pp. 12 140–12 147.
+[21] J. Wang, G. He, and Y. Kantaros, “Probabilistically correct language-
+based
+multi-robot
+planning
+using
+conformal
+prediction,”
+IEEE
+Robotics and Automation Letters, vol. 10, no. 1, pp. 160–167, 2025.
+[22] K. Obata, T. Aoki, T. Horii, T. Taniguchi, and T. Nagai, “LiP-LLM:
+Integrating linear programming and dependency graph with large
+language models for multi-robot task planning,” IEEE Robotics and
+Automation Letters, 2024.
+[23] Y. Chen, J. Arkin, C. Dawson, Y. Zhang, N. Roy, and C. Fan,
+“AutoTAMP: Autoregressive task and motion planning with LLMs
+as translators and checkers,” in 2024 IEEE International Conference
+on Robotics and Automation (ICRA), 2024, pp. 6695–6702.
+[24] B. Yu, H. Kasaei, and M. Cao, “Co-navgpt: Multi-robot cooperative vi-
+sual semantic navigation using large language models,” arXiv preprint
+arXiv:2310.07937, 2023.
+[25] M. Tan, “Multi-agent reinforcement learning: independent versus
+cooperative agents,” in Proceedings of the Tenth International Con-
+ference on International Conference on Machine Learning, 1993, p.
+330–337.
+[26] R. Lowe, Y. WU, A. Tamar, J. Harb, O. Pieter Abbeel, and I. Mor-
+datch, “Multi-agent actor-critic for mixed cooperative-competitive
+environments,” in Advances in Neural Information Processing Systems,
+vol. 30, 2017.
+[27] C. Schroeder de Witt, J. Foerster, G. Farquhar, P. Torr, W. Boehmer,
+and S. Whiteson, “Multi-agent common knowledge reinforcement
+learning,” in Advances in Neural Information Processing Systems,
+vol. 32, 2019.
+[28] T. Rashid, M. Samvelyan, C. S. De Witt, G. Farquhar, J. Foerster, and
+S. Whiteson, “Monotonic value function factorisation for deep multi-
+agent reinforcement learning,” Journal of Machine Learning Research,
+vol. 21, no. 178, pp. 1–51, 2020.
+[29] K. Rakelly, A. Zhou, C. Finn, S. Levine, and D. Quillen, “Efﬁcient off-
+policy meta-reinforcement learning via probabilistic context variables,”
+in Proceedings of the 36th International Conference on Machine
+Learning, ser. Proceedings of Machine Learning Research, vol. 97.
+PMLR, 2019, pp. 5331–5340.
+[30] J. Wei, X. Wang, D. Schuurmans, M. Bosma, brian ichter, F. Xia,
+E. H. Chi, Q. V. Le, and D. Zhou, “Chain of thought prompting
+elicits reasoning in large language models,” in Advances in Neural
+Information Processing Systems, 2022.
+[31] T. Kojima, S. S. Gu, M. Reid, Y. Matsuo, and Y. Iwasawa, “Large
+language models are zero-shot reasoners,” in Advances in Neural
+Information Processing Systems, 2022.
+[32] OpenAI, “gpt4o,” (November 20 version), 2024. [Online]. Available:
+https://platform.openai.com/docs/models
+[33] D. Fox, W. Burgard, and S. Thrun, “The dynamic window approach to
+collision avoidance,” IEEE Robotics & Automation Magazine, vol. 4,
+no. 1, pp. 23–33, 1997.
+[34] B. Mehta, M. Diaz, F. Golemo, C. J. Pal, and L. Paull, “Active domain
+randomization,” in Conference on Robot Learning, 2020, pp. 1162–
+1176.
+18707
+Authorized licensed use limited to: Consortium - Saudi Arabia SDL. Downloaded on February 16,2026 at 09:55:51 UTC from IEEE Xplore.  Restrictions apply. 

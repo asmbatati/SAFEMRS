@@ -1,47 +1,170 @@
-# Changelog
+# SAFEMRS Changelog
 
-## 2026-02-16
-- Added related pdfs @[proposal/literature/added]
-- Added changelog
+> Chronological record of all development sessions, prompts, and outcomes for the SAFEMRS project.
 
-## 2026-02-12
+---
 
-### Prompt
-@literature
-Make a Python script that extracts all these papers and converts them to txt.
-Also make refactoring of the repo.
+## Session 4 — 2026-02-16 (Afternoon)
 
-### Response
-Created @txt.
+### 4.1 Update Architecture Proposal with Expanded Literature
 
-### Prompt
-Analyze the literature and make a summary in md file.
+**Prompt:**
+> Now update the architecture proposal to reflect the expanded literature summary.
 
-### Response
-Created @literature_summary.md.
+**Changes to [architecture_proposal.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/architecture_proposal.md)** (433 → 500 lines):
 
-### Prompt
-Now, we would like to develop a new architecture of heterogeneous multi-robot system as shown in the picture.
-We assume that we have a multi-robot system in a partially observed environment.
-The system can receive commands in natural languages from a human. It goes through an agentic reasoning layer which is connected to the multi-robot systems, also connected to external resources through MCP tools and agents, and is able to convert human intent into complex workflows to be executed by the multi-robot system. Any complex task can be executed by one robot or multiple robots.
-The robots may or may not have access to external information. They are able to communicate with each other.
-One of the most important contributions is that we will have a safety layer that will ensure the safe operation of any complex multi-task execution by the multi-robot system.
-We will have also a real-time monitoring layer that will connect real available data during execution from the multi-robot system and external world.
+| Section | Before | After |
+|---------|--------|-------|
+| §1 Motivation | 4 bullet categories | 7 categories (+runtime safety, code gen, multi-agent, hybrid LLM+RL) |
+| §4.3 Safety Reasoning Layer | Dual-channel (formal + LLM) | **Triple-channel** (formal + LLM + CBF runtime enforcement) with conformal prediction |
+| §4.4 Real-Time Monitoring | Basic monitoring | References LLM-CBT, CLGA, integrates CBF safety margins |
+| §4.5 Abstract Planning Layer | 5 backends | **8 backends** (+STL from AutoTAMP, FSM from Mu et al., Code Gen from Code as Policies/ProgPrompt) |
+| §6.1 Feature Comparison Matrix | 8 systems, 12 features | **14 systems**, 16 features (+CBF enforcement, conformal, code gen, multi-agent dialog) |
+| §6.2 Positioning Paragraphs | 6 comparisons | **12 comparisons** (+SAFER, S-ATLAS, RoCo, LLM-CBT, Code as Policies, NL2HLTL2PLAN) |
+| §7 Novelty Claims | 4 novelties | **5 novelties** (+Novelty 5: Multi-paradigm safety integration) |
+| §8 Research Questions | 4 RQs | **5 RQs** (+RQ5 on conformal prediction calibration) |
+| §9 Evaluation Plan | 5 dimensions | **7 dimensions** (+Runtime Safety, Manipulation; +RoCoBench, LEMMA, OBiMan-Bench) |
+| §10 Summary Table | 7 gaps | **10 gaps** (+runtime enforcement, probabilistic bounds, code safety) |
 
-We want to use formal logic verification on top of LLM reasoning to combine a rule-based approach (formal verification) and probabilistic LLM reasoning in our system.
+Key architectural evolution: dual-channel → **triple-channel** safety verification integrating CBFs (from SAFER), conformal prediction (from S-ATLAS), and syntax-guaranteed LTL (from LTLCodeGen).
 
-For modeling multi-robot task planning, we can use general-purpose semi-structured data (JSON, YAML) or dedicated planning frameworks (PDDL or Behavior Tree which are more recent - you can propose other trending planning techniques if available), but we may use an abstract planning layer for now that can support multiple technologies like PDDL, behavior tree, or others.
+---
 
-Make me an md file that writes this idea clearly and systematically and contrasts it with the literature you summarized above.
-This is a picture that also illustrates our idea: @proposal-idea.png.
+### 4.2 Update Competitive Analysis with New Insights
 
-You can also make a mermaid diagram.
+**Prompt:**
+> Now update competitive_analysis.md with the new insights.
 
-### Response
-Created @architecture_proposal.md.
+**Changes to [competitive_analysis.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/competitive_analysis.md)** (360 → 461 lines):
 
-### Prompt
-Now, make me an md file that compares clearly with this paper and my idea and propose how to make my contribution more substantial and not just incremental for IROS and ICRA.
+| Section | Before | After |
+|---------|--------|-------|
+| §1 Integration Trap | 8 rows | **13 rows** (+CBF, conformal, code gen, dialog, hybrid RL) |
+| §2 Competitors | 7 systems (§2.1–2.7) | **12 systems** (§2.1–2.12: +SAFER, S-ATLAS, RoCo, LLM-CBT, Code as Policies) |
+| §2.2 VerifyLLM | Single system | **3-way comparison** (VerifyLLM + LTLCodeGen + NL2HLTL2PLAN) |
+| §2.13 Summary Heatmap | 8 systems × 10 columns | **14 systems × 13 columns** |
+| §3 Strategy A | Dual-channel with 5-category benchmark | **Triple-channel** with 7-category benchmark + conformal calibration |
+| §4 Paper Structure | 3 related work categories | **5 categories** (+runtime safety, code gen) |
+| §5 Rejection Table | Generic baselines | **8 baselines** with channel-specific failure modes |
+| §6 Action Plan | Dual-channel + 2 backends | **Triple-channel** (3 sub-channels) + **8 backends** + 8 baselines |
+| §7 Final Recommendation | 5 reasons, dual-channel | **6 reasons**, triple-channel |
 
-### Response
-Created @competitive_analysis.md.
+All "dual-channel" references updated to "triple-channel." New suggested paper title:
+> *"Triple-Channel Corroborative Safety Verification for LLM-Based Multi-Robot Task Planning: Unifying Formal Logic, Probabilistic Reasoning, and Runtime Enforcement"*
+
+---
+
+## Session 3 — 2026-02-16 (Morning)
+
+### 3.1 Extract Added PDFs to Text
+
+**Prompt:**
+> Read the CHANGELOG.md first. Then proposal/literature/pdf/added — Make a Python script that extracts all the added papers and converts them to txt in proposal/literature/txt/added. Also make refactoring of the repo. After you finish update the CHANGELOG.md.
+
+**Outcome:**
+- Refactored `proposal/scripts/extract_pdfs.py` to support command-line arguments for flexible input/output directories
+- Installed `pymupdf` dependency
+- Extracted 30 new PDFs from `proposal/literature/pdf/added` → `proposal/literature/txt/added`
+
+---
+
+### 3.2 Expand Literature Summary (16 → 46 Papers)
+
+**Prompt:**
+> Now analyze the new papers and add them to the literature summary.
+
+**Changes to [literature_summary.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/literature_summary.md):**
+
+Added 30 new paper summaries (§2.17 – §2.46) organized in 3 batches:
+
+| Batch | Papers | Key Topics |
+|-------|--------|------------|
+| §2.17–2.26 | SAFER, LLM-CBT, LTLCodeGen, NL2HLTL2PLAN, S-ATLAS, Yuan et al., CLGA, EmbodiedAgent, Wang et al., Chen et al. | Safety pipelines, BT generation, formal specs, conformal prediction |
+| §2.27–2.36 | Code-as-Symbolic-Planner, ICCO, FCRF, Huang Survey, Reasoner, Zuzuárregui, RoCo, AutoTAMP, LEMMA, AutoMisty | Code generation, MARL, reflection, multi-agent dialog, STL |
+| §2.37–2.46 | Kwon et al., Hoffmeister, Code as Policies, ProgPrompt, LLM-GROP, LABOR, Mu et al., OBiMan | Scene graphs, zero-knowledge BTs, manipulation benchmarks |
+
+Updated all thematic analysis sections (LLM integration, dependency modeling, heterogeneous teams, safety/verification, benchmarks) and comparative summary table to span all 46 papers (44 unique).
+
+---
+
+## Session 2 — 2026-02-12 (Afternoon)
+
+### 2.1 Architecture Proposal
+
+**Prompt:**
+> Now, we would like to develop a new architecture of heterogeneous multi-robot system as shown in the picture. We assume that we have a multi-robot system in a partially observed environment. The system can receive commands in natural languages from a human. It goes through an agentic reasoning layer which is connected to the multi-robot systems, also connected to external resources through MCP tools and agents, and is able to convert human intent into complex workflows to be executed by the multi-robot system. Any complex task can be executed by one robot or multiple robots. The robots may or may not have access to external information. They are able to communicate with each other. One of the most important contributions is that we will have a safety layer that will ensure the safe operation of any complex multi-task execution by the multi-robot system. We will have also a real-time monitoring layer that will connect real available data during execution from the multi-robot system and external world.
+>
+> We want to use formal logic verification on top of LLM reasoning to combine a rule-based approach (formal verification) and probabilistic LLM reasoning in our system.
+>
+> For modeling multi-robot task planning, we can use general-purpose semi-structured data (JSON, YAML) or dedicated planning frameworks (PDDL or Behavior Tree which are more recent - you can propose other trending planning techniques if available), but we may use an abstract planning layer for now that can support multiple technologies like PDDL, behavior tree, or others.
+>
+> Make me an md file that writes this idea clearly and systematically and contrasts it with the literature you summarized above. This is a picture that also illustrates our idea: proposal-idea.png. You can also make a mermaid diagram.
+
+**Outcome:** Created [architecture_proposal.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/architecture_proposal.md) with:
+- 5-layer architecture (ARL, SRL, APL, RTM, MRS)
+- Dual-channel safety verification (formal + LLM)
+- Abstract planning layer (5 backends)
+- Mermaid architecture diagram
+- Feature comparison matrix (8 systems)
+- 4 novelties, 4 research questions
+
+---
+
+### 2.2 Competitive Analysis
+
+**Prompt:**
+> Now, make me an md file that compares clearly with this paper and my idea and propose how to make my contribution more substantial and not just incremental for IROS and ICRA.
+
+**Outcome:** Created [competitive_analysis.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/competitive_analysis.md) with:
+- Integration trap analysis (what reviewers will say)
+- 7 paper-by-paper comparisons (SafePlan, VerifyLLM, COHERENT, DEXTER-LLM, LaMMA-P, LiP-LLM, DART-LLM)
+- Summary heatmap
+- 4 strategies (A: dual-channel safety, B: agentic MCP, C: POMDP safety, D: combined)
+- Recommended paper structure, rejection avoidance, action plan
+
+---
+
+## Session 1 — 2026-02-12 (Morning)
+
+### 1.1 PDF Extraction Script
+
+**Prompt:**
+> Make a Python script that extracts all these papers and converts them to txt. Also make refactoring of the repo.
+
+**Outcome:**
+- Created `proposal/scripts/extract_pdfs.py` using PyMuPDF
+- Extracted 16 original PDFs from `proposal/literature/pdf` → `proposal/literature/txt`
+
+---
+
+### 1.2 Initial Literature Summary
+
+**Prompt:**
+> Analyze the literature and make a summary in md file.
+
+**Outcome:** Created [literature_summary.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/literature_summary.md) with:
+- 16 paper summaries (SMART-LLM, COHERENT, DART-LLM, SafePlan, VerifyLLM, DEXTER-LLM, LaMMA-P, LiP-LLM, PLANTOR, LAN2CB, AutoHMA-LLM, GMATP-LLM, RoCoBench, Kwon et al., Hoffmeister)
+- Thematic analysis (LLM integration, dependency modeling, heterogeneous teams, safety)
+- Comparative summary table
+- Research gaps identification
+
+---
+
+## Project File Structure
+
+```
+SAFEMRS/
+├── CHANGELOG.md                          ← This file
+├── proposal/
+│   ├── architecture_proposal.md          ← SAFEMRS architecture (500 lines)
+│   ├── competitive_analysis.md           ← Competitive strategy (461 lines)
+│   ├── literature_summary.md             ← Literature review (46 papers)
+│   ├── proposal-idea.png                 ← Original architecture sketch
+│   ├── scripts/
+│   │   └── extract_pdfs.py               ← PDF → TXT extraction tool
+│   └── literature/
+│       ├── pdf/                           ← Original 16 PDFs
+│       ├── pdf/added/                     ← 30 additional PDFs
+│       ├── txt/                           ← Extracted text (original)
+│       └── txt/added/                     ← Extracted text (added)
+```

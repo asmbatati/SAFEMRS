@@ -10,19 +10,24 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 ### The "Integration Trap"
 
-| SAFEMRS Component                | Reviewer Will Say: "This Already Exists in…" |
-| -------------------------------- | -------------------------------------------- |
-| Agentic LLM task decomposition   | SMART-LLM, COHERENT, DART-LLM, LaMMA-P       |
-| DAG-based dependency modeling    | DART-LLM, LiP-LLM                            |
-| Formal logic verification (LTL)  | VerifyLLM                                    |
-| LLM-based safety reasoning (CoT) | SafePlan                                     |
-| Dynamic re-planning              | DEXTER-LLM                                   |
-| Heterogeneous robot coordination | COHERENT, AutoHMA-LLM                        |
-| Behavior tree execution          | PLANTOR, LAN2CB                              |
-| PDDL integration                 | LaMMA-P, GMATP-LLM                           |
+| SAFEMRS Component                      | Reviewer Will Say: "This Already Exists in…"            |
+| -------------------------------------- | ------------------------------------------------------- |
+| Agentic LLM task decomposition         | SMART-LLM, COHERENT, DART-LLM, LaMMA-P, CLGA           |
+| DAG-based dependency modeling          | DART-LLM, LiP-LLM                                      |
+| Formal logic verification (LTL)        | VerifyLLM, LTLCodeGen, NL2HLTL2PLAN                     |
+| LLM-based safety reasoning (CoT)       | SafePlan                                                 |
+| CBF runtime safety enforcement         | SAFER                                                    |
+| Probabilistic safety bounds            | S-ATLAS (conformal prediction)                           |
+| Dynamic re-planning                    | DEXTER-LLM, LLM-CBT                                     |
+| Heterogeneous robot coordination       | COHERENT, AutoHMA-LLM                                   |
+| Behavior tree execution                | PLANTOR, LAN2CB, LLM-CBT, Yuan et al., Hoffmeister      |
+| PDDL integration                       | LaMMA-P, GMATP-LLM                                      |
+| Code generation for robot control      | Code as Policies, ProgPrompt, Code-as-Symbolic-Planner  |
+| Multi-agent LLM dialog / negotiation   | RoCo, FCRF, Reasoner (ToM)                               |
+| Hybrid LLM + RL coordination           | ICCO, Chen MAS+RL                                        |
 
 > [!CAUTION]
-> **If the paper reads as "we combine SafePlan + VerifyLLM + DEXTER-LLM + MCP into one system," it will be desk-rejected at top venues.** Integration alone is not a contribution in robotics — reviewers demand either (a) new theory, (b) a new capability that no prior work could achieve, or (c) dramatically better empirical results on challenging benchmarks.
+> **If the paper reads as "we combine SafePlan + VerifyLLM + SAFER + DEXTER-LLM + MCP into one system," it will be desk-rejected at top venues.** The expanded literature (46 papers) means the bar is even higher — individual safety mechanisms (CBFs, conformal prediction, formal logic, LLM reasoning) now all exist separately. SAFEMRS must demonstrate that their **integration produces emergent safety properties** impossible with any subset.
 
 ---
 
@@ -32,17 +37,19 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 | Dimension               | SafePlan                                                                                                               | SAFEMRS                                               |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| **Safety mechanism**    | LLM-based CoT with 3-layer screening (societal → organizational → individual) + invariant/pre/post-condition reasoners | Dual-channel: formal logic (LTL/CTL) + LLM CoT        |
-| **Formal verification** | ❌ No formal logic — purely LLM reasoning                                                                              | ✅ LTL/CTL model checking + deontic logic             |
-| **When it verifies**    | Pre-execution (prompt screening only)                                                                                  | Pre-execution + runtime monitoring                    |
+| **Safety mechanism**    | LLM-based CoT with 3-layer screening (societal → organizational → individual) + invariant/pre/post-condition reasoners | Triple-channel: formal logic (LTL/CTL) + LLM CoT + CBF runtime enforcement |
+| **Formal verification** | ❌ No formal logic — purely LLM reasoning                                                                              | ✅ LTL/CTL model checking + deontic logic + syntax-guaranteed LTL (LTLCodeGen) |
+| **Runtime enforcement** | ❌ Pre-execution screening only                                                                                        | ✅ CBF-based runtime enforcement (inspired by SAFER) |
+| **Probabilistic bounds**| ❌ No calibration                                                                                                       | ✅ Conformal prediction calibration (inspired by S-ATLAS) |
+| **When it verifies**    | Pre-execution (prompt screening only)                                                                                  | Pre-execution + runtime monitoring + CBF enforcement |
 | **Multi-robot**         | Single-robot tasks in AI2-THOR                                                                                         | Heterogeneous multi-robot teams                       |
-| **Hallucination risk**  | High — safety verdict is itself an LLM output                                                                          | Lower — formal channel provides ground truth          |
+| **Hallucination risk**  | High — safety verdict is itself an LLM output                                                                          | Lower — formal channel + CBFs provide ground truth   |
 | **Conflict detection**  | Implicit in CoT reasoning                                                                                              | Explicit resource/spatial/temporal conflict detection |
-| **Benchmark**           | 621 expert-curated prompts                                                                                             | TBD                                                   |
+| **Benchmark**           | 621 expert-curated prompts                                                                                             | TBD (RoCoBench, LEMMA, MRSC planned)                  |
 
-**Gap SAFEMRS fills**: SafePlan's fundamental weakness is that its safety verdict is **another LLM output** — it can hallucinate safety just as it can hallucinate plans. SAFEMRS's formal logic channel provides a **verifiable, non-probabilistic** safety baseline that the LLM channel complements but cannot override.
+**Gap SAFEMRS fills**: SafePlan's fundamental weakness is that its safety verdict is **another LLM output** — it can hallucinate safety just as it can hallucinate plans. SAFEMRS addresses this with three independent channels: formal logic provides **verifiable guarantees**, CBFs provide **runtime enforcement**, and conformal prediction provides **calibrated confidence bounds**.
 
-**But is that enough?** No — combining two existing ideas (SafePlan's CoT + VerifyLLM's LTL) is still integration. See §3 for how to deepen this.
+**But is that enough?** Combining existing ideas is still integration risk. The key differentiator is that SAFEMRS's triple-channel fusion produces **emergent safety properties** impossible with any single channel (see §3).
 
 ---
 
@@ -50,15 +57,18 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 | Dimension                | VerifyLLM                                            | SAFEMRS                                                                            |
 | ------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Logic formalism**      | LTL only                                             | LTL + CTL + Deontic logic                                                          |
-| **Verification method**  | Translation Module (NL → LTL) + LLM sliding window   | Model checking (state space exploration) + LLM CoT                                 |
-| **Scope**                | Post-planning, pre-execution                         | Pre-execution + runtime                                                            |
-| **Multi-robot**          | Single robot (ALFRED, VirtualHome)                   | Multi-robot with inter-robot dependencies                                          |
-| **Error types detected** | Position errors, missing prerequisites, redundancies | + resource conflicts, spatial conflicts, temporal violations, common-sense hazards |
-| **LLM role**             | Verifier only                                        | Planner + verifier + re-planner                                                    |
-| **Results**              | ~40% ordering error reduction                        | TBD                                                                                |
+### 2.2 vs. VerifyLLM / LTLCodeGen / NL2HLTL2PLAN — _Closest competitors on formal verification_
 
-**Gap SAFEMRS fills**: VerifyLLM verifies single-robot plans in fully observable environments. It does not handle multi-robot coordination constraints, resource conflicts, or partial observability. SAFEMRS extends formal verification to **multi-agent temporal properties** — a fundamentally harder problem.
+| Dimension                | VerifyLLM                                             | LTLCodeGen                    | NL2HLTL2PLAN                              | SAFEMRS                                                                            |
+| ------------------------ | ----------------------------------------------------- | ----------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Logic formalism**      | LTL only                                              | LTL (syntax-guaranteed)       | Hierarchical LTL                          | LTL + CTL + Deontic + STL                                                          |
+| **Verification method**  | NL → LTL + LLM sliding window                         | Code generation with syntax guarantees | Hierarchical decomposition        | Model checking + LLM CoT + CBF enforcement                                        |
+| **Scope**                | Post-planning, pre-execution                          | Pre-execution                 | Pre-execution                             | Pre-execution + runtime                                                            |
+| **Multi-robot**          | Single robot                                          | Single robot                  | Multi-robot (scalable)                    | Multi-robot with inter-robot dependencies                                          |
+| **Error types detected** | Position errors, missing prerequisites, redundancies  | Syntax errors in LTL          | Specification completeness                | + resource/spatial/temporal conflicts, common-sense hazards, CBF violations         |
+| **LLM role**             | Verifier only                                         | Code generator                | Spec generator                            | Planner + verifier + re-planner                                                    |
+
+**Gap SAFEMRS fills**: VerifyLLM verifies single-robot plans; LTLCodeGen guarantees syntactic correctness; NL2HLTL2PLAN scales formal specs via hierarchy. None provides **runtime enforcement**, **multi-paradigm safety integration**, or **agentic reasoning**. SAFEMRS combines their strengths (syntax guarantees from LTLCodeGen, hierarchical specs from NL2HLTL2PLAN, LTL verification from VerifyLLM) with CBF runtime enforcement and LLM safety reasoning.
 
 ---
 
@@ -68,12 +78,12 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 | ---------------------- | ------------------------------ | ------------------------------------------- |
 | **Planning**           | Centralized LLM with PEFA loop | Agentic LLM with MCP augmentation           |
 | **Success rate**       | 97.5%                          | TBD                                         |
-| **Safety**             | ❌ None                        | ✅ Dual-channel                             |
+| **Safety**             | ❌ None                        | ✅ Triple-channel (formal + LLM + CBF)      |
 | **External knowledge** | ❌ Closed-loop                 | ✅ MCP tools + external agents              |
 | **Re-planning**        | PEFA feedback loop (internal)  | RTM-triggered (external observation-driven) |
 | **Environment**        | Fully observable simulation    | Partially observable                        |
 
-**Gap SAFEMRS fills**: COHERENT achieves impressive results but in **safe, fully observable** environments. It has no safety layer — a dangerous plan will execute if the LLM generates it. It also cannot access external information to ground its reasoning.
+**Gap SAFEMRS fills**: COHERENT achieves impressive results but in **safe, fully observable** environments. It has no safety layer — a dangerous plan will execute if the LLM generates it. It also cannot access external information to ground its reasoning. Furthermore, the recent works RoCo and FCRF show that LLM-based multi-robot dialog and reflection can improve planning quality — SAFEMRS can integrate these collaboration patterns while adding the critical safety layer that all of them lack.
 
 ---
 
@@ -83,12 +93,12 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 | ---------------------------- | ---------------------- | ---------------------------------------- |
 | **Online re-planning**       | ✅ Yes                 | ✅ Yes                                   |
 | **Unknown environments**     | ✅ Yes                 | ✅ Yes (partially observable)            |
-| **Safety verification**      | ❌ None                | ✅ Dual-channel                          |
+| **Safety verification**      | ❌ None                | ✅ Triple-channel (formal + LLM + CBF)   |
 | **External resource access** | ❌ No                  | ✅ MCP                                   |
 | **Explainability**           | ✅ Verbal explanations | Partial (through CoT traces)             |
 | **Optimization**             | Branch-and-bound       | Abstract (LP, MILP, or heuristic search) |
 
-**Gap SAFEMRS fills**: DEXTER-LLM re-plans dynamically but never verifies whether the new plan is safe. In high-stakes environments (warehouses, hospitals), this is unacceptable.
+**Gap SAFEMRS fills**: DEXTER-LLM re-plans dynamically but never verifies whether the new plan is safe. LLM-CBT similarly supports closed-loop BT re-planning for UAV-UGV swarms but without formal safety verification. In high-stakes environments (warehouses, hospitals), unverified re-planning is unacceptable. SAFEMRS ensures every re-planned mission passes triple-channel verification before execution.
 
 ---
 
@@ -96,13 +106,13 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 | Dimension           | LaMMA-P                  | SAFEMRS                             |
 | ------------------- | ------------------------ | ----------------------------------- |
-| **Planner**         | PDDL + Fast Downward     | Abstract (PDDL, BT, DAG, HTN)       |
-| **Validation**      | PDDL syntactic validator | Formal logic (LTL/CTL) + LLM safety |
+| **Planner**         | PDDL + Fast Downward     | Abstract (8 backends: PDDL, BT, DAG, HTN, STL, FSM, Code, YAML) |
+| **Validation**      | PDDL syntactic validator | Triple-channel safety (formal + LLM + CBF runtime) |
 | **Task allocation** | LLM-based                | LLM-based + formal optimization     |
-| **Benchmark**       | MAT-THOR (70 tasks)      | TBD                                 |
+| **Benchmark**       | MAT-THOR (70 tasks)      | TBD (MAT-THOR + RoCoBench + LEMMA)  |
 | **SR improvement**  | 105% over SMART-LLM      | TBD                                 |
 
-**Gap SAFEMRS fills**: LaMMA-P validates PDDL syntax but not semantic safety. It cannot detect a syntactically valid plan that is semantically dangerous.
+**Gap SAFEMRS fills**: LaMMA-P validates PDDL syntax but not semantic safety. It cannot detect a syntactically valid plan that is semantically dangerous. SAFEMRS supports 8 planning formalisms (not just PDDL) and verifies semantic safety through triple-channel verification including CBF runtime enforcement.
 
 ---
 
@@ -112,9 +122,9 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 | ----------------------- | ---------------------------- | ---------------------------------- |
 | **Dependency modeling** | DAG (LLM-generated)          | DAG (within abstract layer)        |
 | **Task allocation**     | Linear Programming (optimal) | Configurable (LP, MILP, heuristic) |
-| **Safety**              | ❌ None                      | ✅ Dual-channel                    |
+| **Safety**              | ❌ None                      | ✅ Triple-channel                  |
 | **External knowledge**  | ❌ No                        | ✅ MCP                             |
-| **Re-planning**         | ❌ Static                    | ✅ Dynamic                         |
+| **Re-planning**         | ❌ Static                    | ✅ Dynamic (safety-preserving)     |
 
 ---
 
@@ -129,19 +139,95 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 ---
 
-### 2.8 Summary Heatmap
+### 2.8 vs. SAFER (Tazarv et al., 2025) — _Closest competitor on runtime safety_
 
-|             | Task Decomp | Dep. Modeling | Formal Verif. | LLM Safety | Dual Verif. | MCP/External | RT Monitor | Re-plan | Partial Obs. | Multi-Formal |
-| ----------- | :---------: | :-----------: | :-----------: | :--------: | :---------: | :----------: | :--------: | :-----: | :----------: | :----------: |
-| SMART-LLM   |     🟢      |      🔴       |      🔴       |     🔴     |     🔴      |      🔴      |     🔴     |   🔴    |      🔴      |      🔴      |
-| COHERENT    |     🟢      |      🔴       |      🔴       |     🔴     |     🔴      |      🔴      |     🔴     |   🟡    |      🔴      |      🔴      |
-| DART-LLM    |     🟢      |      🟢       |      🔴       |     🔴     |     🔴      |      🔴      |     🔴     |   🔴    |      🔴      |      🔴      |
-| LaMMA-P     |     🟢      |      🔴       |      🟡       |     🔴     |     🔴      |      🔴      |     🔴     |   🔴    |      🔴      |      🔴      |
-| LiP-LLM     |     🟢      |      🟢       |      🔴       |     🔴     |     🔴      |      🔴      |     🔴     |   🔴    |      🔴      |      🔴      |
-| DEXTER-LLM  |     🟢      |      🔴       |      🔴       |     🔴     |     🔴      |      🔴      |     🟡     |   🟢    |      🟢      |      🔴      |
-| SafePlan    |     🔴      |      🔴       |      🔴       |     🟢     |     🔴      |      🔴      |     🔴     |   🔴    |      🔴      |      🔴      |
-| VerifyLLM   |     🔴      |      🔴       |      🟢       |     🔴     |     🔴      |      🔴      |     🔴     |   🔴    |      🔴      |      🔴      |
-| **SAFEMRS** |     🟢      |      🟢       |      🟢       |     🟢     |     🟢      |      🟢      |     🟢     |   🟢    |      🟢      |      🟢      |
+| Dimension               | SAFER                                                   | SAFEMRS                                                    |
+| ----------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
+| **Safety mechanism**    | LLM + CBF runtime enforcement                           | Triple-channel: formal logic + LLM CoT + CBF enforcement  |
+| **Formal verification** | ❌ No formal logic — relies on CBFs alone               | ✅ LTL/CTL model checking + deontic logic                  |
+| **Scope**               | Planning + runtime enforcement                          | Pre-execution + runtime + continuous monitoring            |
+| **Multi-robot**         | Multi-robot (with safety constraints)                   | Heterogeneous multi-robot with inter-robot dependencies    |
+| **Planning formalism**  | Single (LLM-generated)                                  | 8 backends (PDDL, BT, DAG, HTN, STL, FSM, Code, YAML)     |
+| **External knowledge**  | ❌ No                                                   | ✅ MCP tools + external agents                             |
+
+**Gap SAFEMRS fills**: SAFER pioneers LLM+CBF integration but cannot verify **high-level plan correctness** — CBFs enforce low-level safety constraints (e.g., collision avoidance) but cannot catch logical errors (e.g., incorrect task ordering, resource conflicts). SAFEMRS adds formal logic verification and LLM safety reasoning as complementary channels.
+
+---
+
+### 2.9 vs. S-ATLAS (Nayak et al., 2025) — _Closest competitor on probabilistic safety_
+
+| Dimension               | S-ATLAS                                                 | SAFEMRS                                                    |
+| ----------------------- | ------------------------------------------------------- | ---------------------------------------------------------- |
+| **Safety mechanism**    | Conformal prediction for probabilistic correctness      | Triple-channel (formal + LLM + CBF) with conformal calibration |
+| **Guarantees**          | Statistical bounds (user-specified failure rate)         | Statistical bounds + formal guarantees + runtime enforcement |
+| **Multi-robot**         | ✅ Multi-robot task allocation                          | ✅ Heterogeneous multi-robot                               |
+| **Runtime enforcement** | ❌ Pre-execution only                                   | ✅ CBF-based runtime enforcement                           |
+| **Planning formalism**  | Single (LLM-generated)                                  | 8 backends                                                 |
+
+**Gap SAFEMRS fills**: S-ATLAS provides statistical safety guarantees but does not enforce them at runtime. SAFEMRS integrates conformal prediction as one component within a broader safety pipeline that also includes formal verification and CBF enforcement.
+
+---
+
+### 2.10 vs. RoCo (Mandi et al., 2024) — _Closest competitor on multi-agent coordination_
+
+| Dimension               | RoCo                                        | SAFEMRS                                                    |
+| ----------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| **Coordination**        | Inter-robot LLM dialog + negotiation        | Agentic reasoning + MCP + multi-agent dialog (adoptable)   |
+| **Safety**              | ❌ None                                     | ✅ Triple-channel                                          |
+| **Planning formalism**  | Single (dialog-generated plans)             | 8 backends                                                 |
+| **Benchmark**           | RoCoBench (6 tasks, 2 robots)               | TBD (including RoCoBench)                                  |
+
+**Gap SAFEMRS fills**: RoCo's robots negotiate plans but have **no safety verification** — a negotiated plan could be dangerous. SAFEMRS can incorporate RoCo-style dialog within the ARL while ensuring all results pass triple-channel verification.
+
+---
+
+### 2.11 vs. LLM-CBT (Nie et al., 2025) — _Closest competitor on closed-loop BTs_
+
+| Dimension               | LLM-CBT                                    | SAFEMRS                                                    |
+| ----------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| **Planning output**     | Behavior trees (closed-loop)                | 8 planning formalisms (BT is one option)                   |
+| **Re-planning**         | ✅ Dynamic BT re-planning                  | ✅ Safety-preserving re-planning (any formalism)           |
+| **Safety**              | ❌ No formal verification                  | ✅ Triple-channel                                          |
+| **Multi-robot**         | UAV-UGV swarms                              | Heterogeneous multi-robot (any type)                       |
+| **External knowledge**  | ❌ No                                       | ✅ MCP                                                     |
+
+**Gap SAFEMRS fills**: LLM-CBT provides excellent closed-loop BT execution but is locked to a single formalism and has no safety verification. SAFEMRS provides BTs as one of 8 planning backends, all verified by the triple-channel SRL.
+
+---
+
+### 2.12 vs. Code as Policies / ProgPrompt (Liang et al., 2023; Singh et al., 2023) — _Closest competitors on code generation_
+
+| Dimension               | Code as Policies / ProgPrompt               | SAFEMRS                                                    |
+| ----------------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| **Planning output**     | Python code (executable policies)           | Code generation as one of 8 planning backends              |
+| **Safety**              | ❌ Basic assertions only                    | ✅ Triple-channel verification of generated code           |
+| **Multi-robot**         | Single robot                                | Heterogeneous multi-robot                                  |
+| **External knowledge**  | ❌ API library only                         | ✅ MCP tools + external agents                             |
+| **Re-planning**         | ❌ Static                                   | ✅ Dynamic (safety-preserving)                             |
+
+**Gap SAFEMRS fills**: Code generation is a powerful paradigm (also adopted by Code-as-Symbolic-Planner and AutoMisty) but lacks safety verification. Generated code can contain logical errors, unsafe robot commands, or resource conflicts. SAFEMRS verifies generated code through formal and LLM safety channels before execution.
+
+---
+
+### 2.13 Summary Heatmap
+
+|               | Task Decomp | Dep. Model | Formal Verif. | LLM Safety | CBF Enforce | Conformal | Triple Verif. | MCP/External | RT Monitor | Re-plan | Code Gen | Multi-Agent Dialog | Multi-Formal |
+| ------------- | :---------: | :--------: | :-----------: | :--------: | :---------: | :-------: | :-----------: | :----------: | :--------: | :-----: | :------: | :----------------: | :----------: |
+| SMART-LLM     |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
+| COHERENT      |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🟡    |    🔴    |         🔴         |      🔴      |
+| DART-LLM      |     🟢      |     🟢     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
+| LaMMA-P       |     🟢      |     🔴     |      🟡       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
+| LiP-LLM       |     🟢      |     🟢     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
+| DEXTER-LLM    |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🟡     |   🟢    |    🔴    |         �         |      🔴      |
+| SafePlan      |     🔴      |     🔴     |      🔴       |     🟢     |     🔴      |    �     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
+| VerifyLLM     |     🔴      |     🔴     |      🟢       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      �      |
+| SAFER         |     �🟢      |     🔴     |      🔴       |     🔴     |     🟢      |    🔴     |      🔴       |      🔴      |     �     |   🔴    |    🔴    |         🔴         |      🔴      |
+| S-ATLAS       |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🟢     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
+| LLM-CBT       |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🟡     |   🟢    |    🔴    |         🔴         |      🔴      |
+| RoCo          |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🟢         |      🔴      |
+| Code as Pol.  |     🔴      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🟢    |         🔴         |      🔴      |
+| NL2HLTL2PLAN  |     🟢      |     🔴     |      🟢       |     🔴     |     🔴      |    🔴     |      �🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
+| **SAFEMRS**   |     🟢      |     🟢     |      🟢       |     🟢     |     🟢      |    🟢     |      🟢       |      🟢      |     🟢     |   🟢    |    🟢    |         🟢         |      🟢      |
 
 🟢 = Full support | 🟡 = Partial | 🔴 = Not supported
 
@@ -154,34 +240,39 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 ---
 
-### Strategy A: Deep-Dive on Corroborative Dual-Channel Verification (Recommended)
+### Strategy A: Deep-Dive on Corroborative Triple-Channel Verification (Recommended)
 
-**Core idea**: Don't just _combine_ formal verification and LLM CoT — **prove theoretically and demonstrate empirically that neither alone is sufficient, and that their combination provides provably better safety properties**.
+**Core idea**: Don't just _combine_ formal verification, LLM CoT, and CBF enforcement — **prove theoretically and demonstrate empirically that no subset of channels is sufficient, and that the triple-channel fusion provides provably better safety properties than any dual-channel combination**.
 
 #### What to do:
 
 1. **Formalize the Corroborative Fusion** as a decision-theoretic framework:
-   - Define a **safety lattice** where the formal channel provides a _sound but incomplete_ safety verdict (it catches violations of specified properties but misses unspecified common-sense hazards)
+   - Define a **safety lattice** where the formal channel provides a _sound but incomplete_ safety verdict (it catches violations of specified LTL/CTL properties but misses unspecified common-sense hazards)
    - Define the LLM channel as _complete but unsound_ (it can reason about novel hazards but may hallucinate safety)
-   - Prove that the corroborative fusion is **strictly safer** than either channel alone under reasonable assumptions
+   - Define the CBF channel as _runtime-enforcing but plan-agnostic_ (it maintains safety sets but cannot evaluate plan logic)
+   - Prove that the triple-channel fusion is **strictly safer** than any single or dual-channel combination
+   - Incorporate **conformal prediction** (from S-ATLAS) to calibrate confidence scores across channels
 
 2. **Introduce a formal safety metric**, e.g.:
-   - **Safety Coverage** = % of hazard types detectable
+   - **Safety Coverage** = % of hazard types detectable (across specification-level, common-sense, and runtime hazards)
    - **Safety Soundness** = % of "safe" verdicts that are actually safe
    - **Safety Completeness** = % of actually safe plans that are approved
-   - Show theoretically and empirically that dual-channel dominates single-channel on the coverage-soundness Pareto frontier
+   - **Runtime Violation Rate** = % of plans that violate CBF constraints during execution
+   - Show theoretically and empirically that triple-channel dominates dual- and single-channel on the coverage-soundness Pareto frontier
 
 3. **Create a new safety-focused benchmark** — the **Multi-Robot Safety Challenge (MRSC)**:
-   - 500+ scenarios across 5 categories: (i) resource conflicts, (ii) spatial collisions, (iii) temporal deadline violations, (iv) common-sense hazards (LLM-detectable only), (v) constraint violations (formal-logic-detectable only)
-   - Show that **no single-channel system** scores above 70% across all categories, while dual-channel scores 90%+
-   - This benchmark would be a standalone contribution that the community adopts
+   - 500+ scenarios across 7 categories: (i) resource conflicts, (ii) spatial collisions, (iii) temporal deadline violations, (iv) common-sense hazards (LLM-detectable only), (v) constraint violations (formal-logic-detectable only), (vi) runtime perturbations (CBF-detectable only), (vii) combined multi-channel hazards
+   - Show that **no single-channel system** scores above 50% across all categories, **no dual-channel system** above 75%, while triple-channel scores 90%+
+   - Leverage existing benchmarks (RoCoBench, LEMMA, OBiMan-Bench) for task diversity
 
-4. **Ablation study** showing the failure modes of each channel in isolation:
-   - Cases where formal verification says "safe" but LLM catches a common-sense hazard (e.g., "Place the knife on the edge of the table near the child")
-   - Cases where LLM says "safe" but formal logic catches a temporal/resource violation (e.g., two robots scheduled for the same tool simultaneously)
+4. **Ablation study** showing the failure modes of each channel in isolation and in pairs:
+   - Cases where formal verification says "safe" but LLM catches a common-sense hazard
+   - Cases where LLM says "safe" but formal logic catches a temporal/resource violation
+   - Cases where both formal + LLM say "safe" but CBF detects a runtime collision trajectory
+   - Cases where CBF enforcement is insufficient without plan-level logical verification
 
 > [!TIP]
-> **This strategy makes the contribution non-incremental because**: (a) the theoretical framework is new, (b) the benchmark is a standalone contribution, (c) the empirical results demonstrate a capability gap that no prior work can fill.
+> **This strategy makes the contribution non-incremental because**: (a) the theoretical framework for triple-channel fusion is genuinely new (SAFER has CBFs but no formal logic; SafePlan has LLM reasoning but no CBFs; VerifyLLM has formal logic but no LLM safety), (b) the benchmark is a standalone contribution, (c) conformal prediction calibration across channels has never been attempted.
 
 ---
 
@@ -238,10 +329,10 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 If targeting a journal paper (RA-L with IROS presentation), combine Strategies A and B:
 
-1. **Theoretical contribution**: Corroborative safety framework (Strategy A)
-2. **Systems contribution**: Agentic MCP-augmented planning pipeline (Strategy B)
-3. **Benchmark contribution**: Multi-Robot Safety Challenge (from Strategy A)
-4. **Empirical contribution**: Comprehensive experiments showing both safety and grounding improvements
+1. **Theoretical contribution**: Corroborative triple-channel safety framework with conformal prediction calibration (Strategy A)
+2. **Systems contribution**: Agentic MCP-augmented planning pipeline with 8-formalism abstract layer (Strategy B)
+3. **Benchmark contribution**: Multi-Robot Safety Challenge + adoption of RoCoBench/LEMMA (from Strategy A)
+4. **Empirical contribution**: Comprehensive experiments showing safety improvement over SAFER, S-ATLAS, SafePlan, and VerifyLLM individually
 
 ---
 
@@ -252,32 +343,35 @@ Based on what gets accepted at these venues, here is a recommended structure:
 ```
 I.    Introduction (1 page)
       - Problem: LLMs are powerful planners but unsafe + ungrounded
-      - Gap: No framework combines formal safety + LLM reasoning + external grounding
+      - Gap: No framework combines formal safety + CBF runtime + LLM reasoning + external grounding
       - Contribution: 3 bullet points (theory + system + benchmark)
 
 II.   Related Work (0.75 pages)
-      - LLM-based multi-robot planning (SMART-LLM, COHERENT, DART-LLM, LaMMA-P)
-      - Safety in LLM planning (SafePlan, VerifyLLM)
-      - Dynamic re-planning (DEXTER-LLM)
-      - Clear gap statement
+      - LLM-based multi-robot planning (SMART-LLM, COHERENT, DART-LLM, LaMMA-P, RoCo)
+      - Safety in LLM planning (SafePlan, VerifyLLM, LTLCodeGen, NL2HLTL2PLAN)
+      - Runtime safety enforcement (SAFER, S-ATLAS)
+      - Code generation paradigms (Code as Policies, ProgPrompt)
+      - Dynamic re-planning (DEXTER-LLM, LLM-CBT)
+      - Clear gap statement: no work integrates all three safety channels
 
 III.  Problem Formulation (0.75 pages)
       - Formal definition of the safety-aware agentic planning problem
-      - Definitions of safety properties (LTL + deontic)
+      - Definitions of safety properties (LTL + deontic + CBF safety sets)
+      - Triple-channel verification framework with conformal calibration
       - Complexity analysis
 
 IV.   SAFEMRS Architecture (1.5 pages)
       - System overview (one main figure)
       - Agentic Reasoning Layer + MCP
-      - Abstract Planning Layer
-      - Dual-Channel Safety Verification (theoretical framework)
-      - Real-Time Monitoring
+      - Abstract Planning Layer (8 backends)
+      - Triple-Channel Safety Verification (theoretical framework)
+      - Real-Time Monitoring with safety-preserving re-planning
 
 V.    Experiments (1.5 pages)
-      - Benchmark description (MRSC or adaptation of existing)
-      - Baselines: SafePlan, VerifyLLM, COHERENT, DEXTER-LLM, LaMMA-P
-      - Metrics: SR, Safety Coverage, Safety Soundness, Re-planning latency
-      - Results tables + ablation study
+      - Benchmark description (MRSC + RoCoBench + LEMMA)
+      - Baselines: SafePlan, VerifyLLM, SAFER, S-ATLAS, COHERENT, DEXTER-LLM, LaMMA-P, RoCo
+      - Metrics: SR, Safety Coverage, Safety Soundness, CBF violation rate, Re-planning latency
+      - Results tables + triple-channel ablation study
 
 VI.   Discussion & Conclusion (0.5 pages)
       - Key findings
@@ -294,15 +388,15 @@ VI.   Discussion & Conclusion (0.5 pages)
 > [!WARNING]
 > These are the most common reasons multi-robot LLM papers get rejected at IROS/ICRA:
 
-| Mistake                             | Why It Kills the Paper                               | How SAFEMRS Avoids It                                                                |
-| ----------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **"We combine X + Y + Z"**          | Integration ≠ contribution; reviewers want depth     | Focus on ONE deep contribution (dual safety verification) with supporting components |
-| **Simulation only, no real robots** | IROS/ICRA reviewers distrust simulation-only results | Include at least a small real-robot experiment (even 2 robots doing 3 tasks)         |
-| **Only GPT-4 tested**               | "What if it only works because GPT-4 is good?"       | Test on 2–3 LLMs (GPT-4, Claude, Llama-3) to show architecture-level contribution    |
-| **No baselines**                    | Can't judge significance without comparison          | Compare against SafePlan, VerifyLLM, COHERENT, LaMMA-P on same benchmark             |
-| **Vague safety claims**             | "Our system is safer" without quantification         | Define formal safety metrics and measure them rigorously                             |
-| **Too many components, no depth**   | Breadth without depth feels like a tech report       | Cut to 4 key components; give math for the novel one                                 |
-| **No failure analysis**             | Reviewers want to see where the system fails         | Include a "Limitations and Failure Cases" section                                    |
+| Mistake                             | Why It Kills the Paper                               | How SAFEMRS Avoids It                                                                    |
+| ----------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **"We combine X + Y + Z"**          | Integration ≠ contribution; reviewers want depth     | Focus on ONE deep contribution (triple-channel safety verification) with supporting components |
+| **Simulation only, no real robots** | IROS/ICRA reviewers distrust simulation-only results | Include at least a small real-robot experiment (even 2 robots doing 3 tasks)             |
+| **Only GPT-4 tested**               | "What if it only works because GPT-4 is good?"       | Test on 2–3 LLMs (GPT-4, Claude, Llama-3) to show architecture-level contribution        |
+| **No baselines**                    | Can't judge significance without comparison          | Compare against SafePlan, VerifyLLM, SAFER, S-ATLAS, COHERENT, RoCo on same benchmark    |
+| **Vague safety claims**             | "Our system is safer" without quantification         | Define formal safety metrics and measure across triple-channel ablation                   |
+| **Too many components, no depth**   | Breadth without depth feels like a tech report       | Cut to 4 key components; give math for triple-channel fusion                              |
+| **No failure analysis**             | Reviewers want to see where the system fails         | Include a "Limitations and Failure Cases" section with channel-specific failure modes     |
 
 ---
 
@@ -312,23 +406,30 @@ VI.   Discussion & Conclusion (0.5 pages)
 
 - [ ] Choose Strategy A, B, or C as the **primary** contribution
 - [ ] Write the formal problem definition (Section III of the paper)
-- [ ] Design the corroborative safety framework with mathematical rigor
-- [ ] Design the benchmark (500+ scenarios with ground-truth safety labels)
+- [ ] Design the corroborative triple-channel safety framework with mathematical rigor
+- [ ] Formalize the conformal prediction calibration mechanism
+- [ ] Design the benchmark (500+ scenarios with ground-truth safety labels + existing benchmarks)
 
 ### Phase 2: Implementation (3–4 weeks)
 
 - [ ] Implement the Agentic Reasoning Layer with MCP tool integration
-- [ ] Implement the Dual-Channel Safety Verification (LTL model checking + LLM CoT)
-- [ ] Implement the Abstract Planning Layer (start with PDDL + BT backends)
-- [ ] Build the Real-Time Monitoring Layer
-- [ ] Integrate with a multi-robot simulator (AI2-THOR or Gazebo)
+- [ ] Implement the Triple-Channel Safety Verification:
+  - [ ] Formal Logic Channel (LTL/CTL model checking + syntax guarantees from LTLCodeGen)
+  - [ ] Probabilistic LLM Channel (CoT safety reasoning + conformal prediction from S-ATLAS)
+  - [ ] CBF Runtime Enforcement Channel (inspired by SAFER)
+  - [ ] Corroborative fusion with calibrated confidence scores
+- [ ] Implement the Abstract Planning Layer (8 backends: PDDL, BT, DAG, HTN, STL, FSM, Code, YAML)
+- [ ] Build the Real-Time Monitoring Layer with CBF safety margin integration
+- [ ] Integrate with a multi-robot simulator (AI2-THOR, Gazebo, or RoCoBench)
 
 ### Phase 3: Experiments (2–3 weeks)
 
-- [ ] Run benchmark experiments with 4+ baselines
-- [ ] Full ablation study (remove each component independently)
+- [ ] Run benchmark experiments with 8+ baselines (SafePlan, VerifyLLM, SAFER, S-ATLAS, COHERENT, DEXTER-LLM, LaMMA-P, RoCo)
+- [ ] Full ablation study (remove each channel and planning backend independently)
+- [ ] Triple-channel vs. dual-channel vs. single-channel comparison
 - [ ] Test on 2–3 LLM backends
 - [ ] Small real-robot demonstration (if feasible)
+- [ ] Evaluate on RoCoBench, LEMMA, and custom MRSC scenarios
 - [ ] Prepare results tables and figures
 
 ### Phase 4: Writing (1–2 weeks)
@@ -342,18 +443,19 @@ VI.   Discussion & Conclusion (0.5 pages)
 ## 7. Final Recommendation
 
 > [!IMPORTANT]
-> **Go with Strategy A (Dual-Channel Corroborative Safety Verification) as the lead contribution.**
+> **Go with Strategy A (Triple-Channel Corroborative Safety Verification) as the lead contribution.**
 >
 > **Reasons**:
 >
-> 1. **Safety is the hottest topic** in LLM robotics right now — both SafePlan and VerifyLLM appeared in 2025, signaling strong community interest.
-> 2. **No one has combined formal + LLM safety** — this is genuinely novel, not integration of existing systems (SafePlan has no formal logic; VerifyLLM has no LLM safety reasoning).
-> 3. **It's provable** — you can provide theoretical guarantees about the corroborative framework, which IROS/ICRA reviewers value.
-> 4. **The benchmark is a standalone contribution** — even if the architecture is questioned, a high-quality multi-robot safety benchmark will be valued.
+> 1. **Safety is the hottest topic** in LLM robotics right now — SafePlan, VerifyLLM, SAFER, and S-ATLAS all appeared in 2024–2025, signaling intense community interest. The bar has risen significantly.
+> 2. **No one has combined formal + LLM + CBF safety** — this is genuinely novel. SAFER has CBFs but no formal logic; SafePlan has LLM reasoning but no runtime enforcement; VerifyLLM has formal logic but no CBF or LLM safety reasoning; S-ATLAS has conformal prediction but no formal logic or runtime enforcement.
+> 3. **It's provable** — you can provide theoretical guarantees about the triple-channel framework, including conformal prediction calibration bounds, which IROS/ICRA reviewers value.
+> 4. **The benchmark is a standalone contribution** — a high-quality multi-robot safety benchmark with 7 hazard categories (leveraging RoCoBench, LEMMA, and custom MRSC) will be valued.
 > 5. **MCP integration (Strategy B) can be the supporting novelty** — mention it, demonstrate it, but don't make it the headline.
+> 6. **The expanded landscape (46 papers) strengthens the positioning** — with 14 systems in the comparison heatmap, no single competitor covers even 4 of 13 features.
 
 The paper title could be:
 
-> **"Corroborative Safety Verification for LLM-Based Multi-Robot Task Planning: Combining Formal Logic and Probabilistic Reasoning"**
+> **"Triple-Channel Corroborative Safety Verification for LLM-Based Multi-Robot Task Planning: Unifying Formal Logic, Probabilistic Reasoning, and Runtime Enforcement"**
 
-This title signals: (1) a new verification approach, (2) it's for multi-robot systems, (3) it combines two distinct paradigms — exactly what a reviewer wants to see.
+This title signals: (1) a new multi-channel verification approach, (2) it's for multi-robot systems, (3) it combines three distinct paradigms — a significantly stronger positioning than any single-channel approach.
