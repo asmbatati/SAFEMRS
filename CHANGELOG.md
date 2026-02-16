@@ -4,6 +4,68 @@
 
 ---
 
+## Session 6 — 2026-02-16 (Late Afternoon)
+
+### 6.1 Integrate Brainstorming Insights into Proposal Documents
+
+**Prompt:**
+> Update architecture_proposal.md, competitive_analysis.md, and CHANGELOG.md based on the new insights in brainstorming_output.md.
+
+**Changes to [architecture_proposal.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/architecture_proposal.md)** (501 → 545 lines):
+
+| Section | Before | After |
+|---------|--------|-------|
+| Subtitle | Generic architecture description | **"Verifiable Neuro-Symbolic Cognitive Proxy"** framing |
+| §3 Architecture Diagram | 5 subgraphs (ARL, MCP, SRL, RTM, MRS) | **7 subgraphs** (+HAL with 6 adapters, Robot Resumes in MRS) |
+| Robot types | Manipulator + Mobile Base | **Quadruped + UUV (Underwater)** — diverse morphologies |
+| §4.4 RTM | Basic closed-loop monitoring | **PEFA (Proposal-Execution-Feedback-Adjustment)** closed-loop with 4 formalized phases |
+| §4.6 (new) | N/A | **HAL — Middleware-Agnostic Proxy** (ROS 1, ROS 2, gRPC, MAVLink, XRCE-DDS, VLA) |
+| VLA | Not mentioned | **VLA Execution Bridge** for symbolic→continuous control ("last mile" execution) |
+| §4.7 MRS | Basic fleet description | **Embodiment-Aware Fleet** with Robot Resumes (URDF-derived) + Skill Ontology |
+| §5 Sequence Diagram | "Dual-Channel Safety Verification" | **"Triple-Channel Safety Verification"** |
+| §6.1 Heatmap | 16 features | **19 features** (+VLA bridge, HAL/middleware, embodiment-aware allocation) |
+| §7 Novelties | 5 novelties | **6 novelties** (+Novelty 6: Embodiment-Aware Cognitive Proxy) |
+| §10 Summary | 10 gaps addressed | **13 gaps** (+middleware-agnostic, embodiment-aware, symbolic→continuous bridge) |
+
+**Changes to [competitive_analysis.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/proposal/competitive_analysis.md)** (462 → 471 lines):
+
+| Section | Before | After |
+|---------|--------|-------|
+| §2.13 Heatmap | 14 systems × 13 columns | **14 systems × 16 columns** (+VLA Bridge, HAL/Middleware, Robot Resumes) |
+| §3 Strategy D | 4 bullet points | **5 bullets** (+cognitive proxy framing, HAL, VLA, Robot Resumes as systems contributions) |
+| §6 Action Plan | Phase 2 with 4 items | **6 items** (+HAL implementation, Robot Resume generator) |
+| §7 Recommendation | 6 reasons, generic title | **7 reasons** (+cognitive proxy framing), new merged title |
+
+New suggested paper title:
+> *"SAFEMRS: A Verifiable Neuro-Symbolic Cognitive Proxy for Safe Multi-Robot Autonomy with Triple-Channel Safety Verification"*
+
+---
+
+## Session 5 — 2026-02-16 (Afternoon, Later)
+
+### 5.1 Cross-Analysis of Brainstorming and Main.tex vs. Proposal Documents
+
+**Prompt:**
+> Analyze brainstorming.md and main.tex. Then compare them with proposal/architecture_proposal.md and suggested strategies in proposal/competitive_analysis.md. Make a file named brainstorming_output.md.
+
+**Created [brainstorming_output.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/brainstorming_output.md)** — 9-section cross-analysis:
+
+| Section | Content |
+|---------|---------|
+| §1 Document Overview | 4-document comparison table |
+| §2 Architectural Comparison | 7-tier layer mapping (brainstorming 4-tier vs. main.tex 4-tier vs. SAFEMRS 5-layer) |
+| §3 Research Question Alignment | RQ granularity comparison |
+| §4 Concept Inventory | What each document uniquely contributes (VLA, Robot Resumes, PEFA from brainstorming; triple-channel, CBFs, conformal from SAFEMRS) |
+| §5 Competitive Positioning | Feature coverage per framing against 14-system heatmap |
+| §6 Strategy Alignment | Gap analysis for Strategy A and B requirements |
+| §7 Synthesis | Proposed merged 5-tier architecture + keep/drop recommendations |
+| §8 Action Items | 12 concrete tasks (immediate, short-term, paper strategy) |
+| §9 Risk Assessment | 6 risks with severity ratings and mitigations |
+
+Key finding: brainstorming and SAFEMRS are **complementary** — brainstorming provides systems framing (cognitive proxy, HAL, VLA, middleware diversity), SAFEMRS provides safety depth (triple-channel, CBF, conformal prediction).
+
+---
+
 ## Session 4 — 2026-02-16 (Afternoon)
 
 ### 4.1 Update Architecture Proposal with Expanded Literature

@@ -1,0 +1,105 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{A Verifiable Neuro-Symbolic Cognitive Proxy for Safe Language-Driven Multi-Robot Autonomy}
+
+\author{\IEEEauthorblockN{1\textsuperscript{st} Given Name Surname}
+\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+\textit{name of organization (of Aff.)}\\
+City, Country \\
+email address or ORCID}
+\and
+\IEEEauthorblockN{2\textsuperscript{nd} Given Name Surname}
+\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+\textit{name of organization (of Aff.)}\\
+City, Country \\
+email address or ORCID}
+\and
+\IEEEauthorblockN{3\textsuperscript{rd} Given Name Surname}
+\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+\textit{name of organization (of Aff.)}\\
+City, Country \\
+email address or ORCID}
+\and
+\IEEEauthorblockN{4\textsuperscript{th} Given Name Surname}
+\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+\textit{name of organization (of Aff.)}\\
+City, Country \\
+email address or ORCID}
+\and
+\IEEEauthorblockN{5\textsuperscript{th} Given Name Surname}
+\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+\textit{name of organization (of Aff.)}\\
+City, Country \\
+email address or ORCID}
+\and
+\IEEEauthorblockN{6\textsuperscript{th} Given Name Surname}
+\IEEEauthorblockA{\textit{dept. name of organization (of Aff.)} \\
+\textit{name of organization (of Aff.)}\\
+City, Country \\
+email address or ORCID}
+}
+
+\maketitle
+
+\begin{abstract}
+As robotic systems transition from single-purpose platforms to heterogeneous multi-robot teams, bridging the gap between high-level human intent and low-level robotic execution remains a fundamental challenge, particularly in safety-critical environments. Recent language-driven approaches enable flexible task specification but lack formal mechanisms to ensure correctness and safety when deployed across diverse robotic platforms and middleware. This paper introduces a four-tier neuro-symbolic cognitive mediation framework that integrates vision--language models for semantic grounding, hierarchical task networks for mission decomposition, and a formal safety mediation layer that verifies generated plans against robot capabilities and environmental constraints prior to execution. A tool--agent mediation layer decouples abstract task representations from middleware-specific control primitives, enabling coordinated autonomy across heterogeneous systems using ROS~1, ROS~2, and gRPC-based interfaces. The framework is evaluated in a complex, GPS-denied cave search-and-rescue scenario involving ground, aerial, and underwater robots, demonstrating safe execution, adaptive re-planning under failure, and consistent coordination across disparate platforms.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Multi-Robot Systems, Language-Driven Autonomy, Formal Verification, Hierarchical Task Planning, Safety-Critical Robotics
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Robotic systems are increasingly expected to operate autonomously in unstructured, dynamic, and safety-critical environments, often as part of heterogeneous multi-robot teams. Recent advances in large language models and learning-based agents have enabled flexible human--robot interaction and high-level task specification, but integrating such agents into real-world robotic systems remains challenging. In particular, language-driven and learning-based controllers introduce uncertainty, limited interpretability, and a lack of formal safety guarantees, which restrict their deployment in high-stakes multi-robot missions.
+
+\subsection{Central Research Question}
+The central research question addressed in this paper is:
+\begin{quote}
+How can high-level, language-driven autonomy be safely and reliably integrated into heterogeneous multi-robot systems while providing formal guarantees of correctness and adaptability in dynamic environments?
+\end{quote}
+
+\subsection{Key Insight}
+We argue that the key limitation of existing language-driven robotic systems lies in the absence of an explicit, verifiable mediation layer between high-level intent and low-level robot execution. Treating large language models as direct controllers or planners creates brittle, opaque systems that cannot be rigorously analyzed or certified for safety-critical deployment.
+
+\subsection{Key Contribution}
+This paper introduces a verifiable neuro-symbolic cognitive proxy architecture that mediates between human intent, high-level reasoning, and physical robot execution in heterogeneous multi-robot systems. The proposed architecture decomposes autonomy into layered components, combining vision--language grounding, hierarchical task planning, and formal constraint solving to ensure that all generated plans satisfy system-level and robot-specific safety constraints prior to execution. This mediation enables adaptive, language-driven coordination while preserving formal guarantees of safety and feasibility.
+
+\subsection{Technical Contributions}
+The main contributions of this work are:
+\begin{itemize}
+    \item A multi-layer cognitive proxy architecture that integrates language models, symbolic planning, and formal verification for multi-robot autonomy.
+    \item A formal safety mediation mechanism that verifies high-level plans against robot capabilities, environmental constraints, and mission requirements before execution.
+    \item A heterogeneous robot abstraction that enables coordinated autonomy across platforms with differing dynamics, sensors, and capabilities.
+    \item Validation in representative multi-robot scenarios demonstrating safe adaptation to dynamic failures and changing mission conditions.
+\end{itemize}
+
+\subsection{Scope and Positioning}
+This work does not propose a new large language model or learning algorithm. Instead, it focuses on the principled integration of existing learning-based and symbolic methods into a unified, verifiable autonomy framework suitable for safety-critical multi-robot systems.
+
+\subsection{Organization}
+The remainder of this paper is organized as follows. Section~\ref{sec:architecture} introduces the cognitive proxy architecture. Section~\ref{sec:planning} describes the planning and verification components. Section~\ref{sec:experiments} presents experimental validation in heterogeneous multi-robot scenarios, and Section~\ref{sec:discussion} discusses limitations and future directions.
+
+\section*{Acknowledgment}
+
+The preferred spelling of the word ``acknowledgment'' in America is without 
+an ``e'' after the ``g''. Avoid the stilted expression ``one of us (R. B. 
+G.) thanks $\ldots$''. Instead, try ``R. B. G. thanks$\ldots$''. Put sponsor 
+acknowledgments in the unnumbered footnote on the first page.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references/references.bib}
+
+\end{document}

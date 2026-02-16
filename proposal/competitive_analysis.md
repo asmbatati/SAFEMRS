@@ -211,23 +211,23 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 ### 2.13 Summary Heatmap
 
-|               | Task Decomp | Dep. Model | Formal Verif. | LLM Safety | CBF Enforce | Conformal | Triple Verif. | MCP/External | RT Monitor | Re-plan | Code Gen | Multi-Agent Dialog | Multi-Formal |
-| ------------- | :---------: | :--------: | :-----------: | :--------: | :---------: | :-------: | :-----------: | :----------: | :--------: | :-----: | :------: | :----------------: | :----------: |
-| SMART-LLM     |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
-| COHERENT      |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🟡    |    🔴    |         🔴         |      🔴      |
-| DART-LLM      |     🟢      |     🟢     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
-| LaMMA-P       |     🟢      |     🔴     |      🟡       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
-| LiP-LLM       |     🟢      |     🟢     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
-| DEXTER-LLM    |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🟡     |   🟢    |    🔴    |         �         |      🔴      |
-| SafePlan      |     🔴      |     🔴     |      🔴       |     🟢     |     🔴      |    �     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
-| VerifyLLM     |     🔴      |     🔴     |      🟢       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      �      |
-| SAFER         |     �🟢      |     🔴     |      🔴       |     🔴     |     🟢      |    🔴     |      🔴       |      🔴      |     �     |   🔴    |    🔴    |         🔴         |      🔴      |
-| S-ATLAS       |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🟢     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
-| LLM-CBT       |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🟡     |   🟢    |    🔴    |         🔴         |      🔴      |
-| RoCo          |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🟢         |      🔴      |
-| Code as Pol.  |     🔴      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🟢    |         🔴         |      🔴      |
-| NL2HLTL2PLAN  |     🟢      |     🔴     |      🟢       |     🔴     |     🔴      |    🔴     |      �🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |
-| **SAFEMRS**   |     🟢      |     🟢     |      🟢       |     🟢     |     🟢      |    🟢     |      🟢       |      🟢      |     🟢     |   🟢    |    🟢    |         🟢         |      🟢      |
+|               | Task Decomp | Dep. Model | Formal Verif. | LLM Safety | CBF Enforce | Conformal | Triple Verif. | MCP/External | RT Monitor | Re-plan | Code Gen | Multi-Agent Dialog | Multi-Formal | VLA Bridge | HAL/Middleware | Robot Resumes |
+| ------------- | :---------: | :--------: | :-----------: | :--------: | :---------: | :-------: | :-----------: | :----------: | :--------: | :-----: | :------: | :----------------: | :----------: | :--------: | :------------: | :-----------: |
+| SMART-LLM     |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| COHERENT      |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🟡    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| DART-LLM      |     🟢      |     🟢     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| LaMMA-P       |     🟢      |     🔴     |      🟡       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| LiP-LLM       |     🟢      |     🟢     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| DEXTER-LLM    |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🟡     |   🟢    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| SafePlan      |     🔴      |     🔴     |      🔴       |     🟢     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| VerifyLLM     |     🔴      |     🔴     |      🟢       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| SAFER         |     🟢      |     🔴     |      🔴       |     🔴     |     🟢      |    🔴     |      🔴       |      🔴      |     🟡     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| S-ATLAS       |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🟢     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| LLM-CBT       |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🟡     |   🟢    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| RoCo          |     🟢      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🟢         |      🔴      |     🔴     |       🔴       |      🔴       |
+| Code as Pol.  |     🔴      |     🔴     |      🔴       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🟢    |         🔴         |      🔴      |     🟡     |       🔴       |      🔴       |
+| NL2HLTL2PLAN  |     🟢      |     🔴     |      🟢       |     🔴     |     🔴      |    🔴     |      🔴       |      🔴      |     🔴     |   🔴    |    🔴    |         🔴         |      🔴      |     🔴     |       🔴       |      🔴       |
+| **SAFEMRS**   |     🟢      |     🟢     |      🟢       |     🟢     |     🟢      |    🟢     |      🟢       |      🟢      |     🟢     |   🟢    |    🟢    |         🟢         |      🟢      |     🟢     |       🟢       |      🟢       |
 
 🟢 = Full support | 🟡 = Partial | 🔴 = Not supported
 
@@ -325,14 +325,15 @@ Before proposing solutions, we must confront the risk that IROS/ICRA reviewers w
 
 ---
 
-### Strategy D: Combine A + B (Most Ambitious — Potential RA-L + IROS)
+### Strategy D: Combine A + B + Systems Innovations (Most Ambitious — Potential RA-L + IROS)
 
-If targeting a journal paper (RA-L with IROS presentation), combine Strategies A and B:
+If targeting a journal paper (RA-L with IROS presentation), combine Strategies A and B with the systems contributions identified in the brainstorming analysis:
 
 1. **Theoretical contribution**: Corroborative triple-channel safety framework with conformal prediction calibration (Strategy A)
-2. **Systems contribution**: Agentic MCP-augmented planning pipeline with 8-formalism abstract layer (Strategy B)
+2. **Systems contribution**: Agentic MCP-augmented planning pipeline with 8-formalism abstract layer (Strategy B) + Hardware Abstraction Layer (HAL) bridging 6 middleware protocols + VLA execution bridge for fine-grained manipulation + Robot Resumes (URDF-derived capability modeling) for embodiment-aware allocation
 3. **Benchmark contribution**: Multi-Robot Safety Challenge + adoption of RoCoBench/LEMMA (from Strategy A)
 4. **Empirical contribution**: Comprehensive experiments showing safety improvement over SAFER, S-ATLAS, SafePlan, and VerifyLLM individually
+5. **Framing**: Position SAFEMRS as a **verifiable neuro-symbolic cognitive proxy** — merging the cognitive proxy framing with the triple-channel safety contribution
 
 ---
 
@@ -419,7 +420,9 @@ VI.   Discussion & Conclusion (0.5 pages)
   - [ ] CBF Runtime Enforcement Channel (inspired by SAFER)
   - [ ] Corroborative fusion with calibrated confidence scores
 - [ ] Implement the Abstract Planning Layer (8 backends: PDDL, BT, DAG, HTN, STL, FSM, Code, YAML)
-- [ ] Build the Real-Time Monitoring Layer with CBF safety margin integration
+- [ ] Build the Real-Time Monitoring Layer with PEFA closed-loop and CBF safety margin integration
+- [ ] Implement the Hardware Abstraction Layer (HAL) with ROS 1, ROS 2, gRPC, MAVLink, XRCE-DDS, VLA adapters
+- [ ] Build Robot Resume generator (URDF → textual capability summary) for embodiment-aware task allocation
 - [ ] Integrate with a multi-robot simulator (AI2-THOR, Gazebo, or RoCoBench)
 
 ### Phase 3: Experiments (2–3 weeks)
@@ -443,7 +446,7 @@ VI.   Discussion & Conclusion (0.5 pages)
 ## 7. Final Recommendation
 
 > [!IMPORTANT]
-> **Go with Strategy A (Triple-Channel Corroborative Safety Verification) as the lead contribution.**
+> **Go with Strategy A (Triple-Channel Corroborative Safety Verification) as the lead contribution, framed through the "cognitive proxy" lens from brainstorming.**
 >
 > **Reasons**:
 >
@@ -451,11 +454,12 @@ VI.   Discussion & Conclusion (0.5 pages)
 > 2. **No one has combined formal + LLM + CBF safety** — this is genuinely novel. SAFER has CBFs but no formal logic; SafePlan has LLM reasoning but no runtime enforcement; VerifyLLM has formal logic but no CBF or LLM safety reasoning; S-ATLAS has conformal prediction but no formal logic or runtime enforcement.
 > 3. **It's provable** — you can provide theoretical guarantees about the triple-channel framework, including conformal prediction calibration bounds, which IROS/ICRA reviewers value.
 > 4. **The benchmark is a standalone contribution** — a high-quality multi-robot safety benchmark with 7 hazard categories (leveraging RoCoBench, LEMMA, and custom MRSC) will be valued.
-> 5. **MCP integration (Strategy B) can be the supporting novelty** — mention it, demonstrate it, but don't make it the headline.
-> 6. **The expanded landscape (46 papers) strengthens the positioning** — with 14 systems in the comparison heatmap, no single competitor covers even 4 of 13 features.
+> 5. **MCP integration, HAL, and VLA (Strategy B + systems innovations) support the narrative** — demonstrate them, but don't make them the headline.
+> 6. **The expanded landscape (46 papers) strengthens the positioning** — with 14 systems in the comparison heatmap, no single competitor covers even 4 of 16 features.
+> 7. **The "cognitive proxy" framing** (from brainstorming) adds conceptual coherence — SAFEMRS is not just a pipeline of tools, it's a **verifiable mediation proxy** between human intent and robot execution.
 
 The paper title could be:
 
-> **"Triple-Channel Corroborative Safety Verification for LLM-Based Multi-Robot Task Planning: Unifying Formal Logic, Probabilistic Reasoning, and Runtime Enforcement"**
+> **"SAFEMRS: A Verifiable Neuro-Symbolic Cognitive Proxy for Safe Multi-Robot Autonomy with Triple-Channel Safety Verification"**
 
-This title signals: (1) a new multi-channel verification approach, (2) it's for multi-robot systems, (3) it combines three distinct paradigms — a significantly stronger positioning than any single-channel approach.
+This title signals: (1) a cognitive proxy architecture (systems framing), (2) triple-channel safety verification (primary contribution), (3) multi-robot autonomy (application domain), and (4) neuro-symbolic integration (methodology) — merging the brainstorming vision with the competitive analysis positioning.

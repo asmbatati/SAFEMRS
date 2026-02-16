@@ -1,6 +1,6 @@
-# SAFEMRS: Safe Agentic Framework for Externally-augmented Multi-Robot Systems
+# SAFEMRS: A Verifiable Neuro-Symbolic Cognitive Proxy for Safe Multi-Robot Autonomy with Triple-Channel Safety Verification
 
-> A Novel Architecture for LLM-Based Heterogeneous Multi-Robot Task Planning with Triple-Channel Safety Verification, Agentic Reasoning, Multi-Formalism Planning, and Real-Time Monitoring
+> A Verifiable Neuro-Symbolic Cognitive Proxy for Safe Language-Driven Multi-Robot Autonomy — integrating Triple-Channel Safety Verification, Agentic Reasoning, Multi-Formalism Planning (8 backends), and Real-Time Monitoring with PEFA Closed-Loop Adaptation
 
 ---
 
@@ -62,12 +62,22 @@ graph TB
         Replan["Re-Planning Trigger<br/>(Dynamic Task Adaptation)"]
     end
 
+    subgraph HAL["🔧 Hardware Abstraction Layer (HAL)"]
+        direction LR
+        ROS2_Adapter["ROS 2 Adapter<br/>(Humble/Jazzy)"]
+        ROS1_Bridge["ROS 1 Bridge"]
+        gRPC_Adapter["gRPC Adapter"]
+        MAVLink_Adapter["MAVLink/MAVROS<br/>(PX4 Autopilot)"]
+        VLA_Bridge["VLA Execution Bridge<br/>(Vision-Language-Action)"]
+    end
+
     subgraph MRS["🤖 Multi-Robot System (Partially Observable)"]
         direction TB
         R1["Robot R₁<br/>(UAV — Aerial)"]
         R2["Robot R₂<br/>(UGV — Ground)"]
-        R3["Robot R₃<br/>(Manipulator)"]
-        R4["Robot R₄<br/>(Mobile Base)"]
+        R3["Robot R₃<br/>(Quadruped)"]
+        R4["Robot R₄<br/>(UUV — Underwater)"]
+        Resume["Robot Resumes<br/>(URDF-derived Capabilities)"]
         InterComm["Inter-Robot<br/>Communication"]
         R1 <--> InterComm
         R2 <--> InterComm
@@ -88,7 +98,9 @@ graph TB
     CoT_Safety -->|"Invariant Check"| Conflict
     Conflict -->|"Conflict-Free Plan"| APL
 
-    APL ==>|"Send Mission<br/>(Augmented Context)"| MRS
+    APL ==>|"Send Mission<br/>(Augmented Context)"| HAL
+    HAL ==>|"Platform-Specific<br/>Commands"| MRS
+    Resume -->|"Capability Query"| LLM
     MRS -->|"Telemetry &<br/>Observations"| StateAgg
     StateAgg --> Anomaly
     Anomaly -->|"Anomaly Alert"| Replan
@@ -221,15 +233,22 @@ Both pre-execution channels produce independent verdicts. A **corroborative fusi
 
 ---
 
-### 4.4 Real-Time Monitoring Layer (RTM)
+### 4.4 Real-Time Monitoring Layer (RTM) — PEFA Closed-Loop
 
-Unlike existing frameworks that plan once and execute blindly, our RTM provides **closed-loop awareness** — integrating concepts from LLM-CBT's closed-loop BT execution, CLGA's dual-process responsiveness, and DEXTER-LLM's online adaptation into a unified monitoring pipeline:
+Unlike existing frameworks that plan once and execute blindly, our RTM implements a **PEFA (Proposal-Execution-Feedback-Adjustment) closed loop** — integrating concepts from LLM-CBT's closed-loop BT execution, CLGA's dual-process responsiveness, and DEXTER-LLM's online adaptation into a unified monitoring pipeline:
 
-| Component               | Role                                                                                                                                                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **State Aggregator**    | Fuses telemetry from all robots (pose, battery, task progress) with external data (sensor feeds via MCP, environmental changes) into a unified world state; integrates CBF safety margin values from the SRL Runtime Channel |
-| **Anomaly Detector**    | Monitors for execution drift — deviations from planned trajectories, unexpected obstacles, robot failures, CBF constraint violations, or environmental changes              |
-| **Re-Planning Trigger** | When anomalies exceed thresholds, triggers the Workflow Composer for dynamic re-planning through the same verified pipeline (safety-preserving re-planning via CBF constraints) |
+| Component               | Role                                                                                                                                                                        | PEFA Phase |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| **State Aggregator**    | Fuses telemetry from all robots (pose, battery, task progress) with external data (sensor feeds via MCP, environmental changes) into a unified world state; integrates CBF safety margin values from the SRL Runtime Channel | **Feedback** |
+| **Anomaly Detector**    | Monitors for execution drift — deviations from planned trajectories, unexpected obstacles, robot failures, CBF constraint violations, or environmental changes              | **Feedback** |
+| **Re-Planning Trigger** | When anomalies exceed thresholds, triggers the Workflow Composer for dynamic re-planning through the same verified triple-channel pipeline (safety-preserving re-planning via CBF constraints) | **Adjustment** |
+
+The PEFA loop formalizes the closed-loop cycle:
+
+1. **Proposal**: ARL generates and SRL verifies a candidate plan
+2. **Execution**: HAL dispatches the plan to the heterogeneous fleet via platform-specific adapters
+3. **Feedback**: RTM continuously aggregates telemetry, detects anomalies, and monitors CBF safety margins
+4. **Adjustment**: When drift or violations are detected, the RTM triggers re-planning through the full verified pipeline
 
 The RTM feeds live state back to the ARL, enabling the LLM to make **informed decisions** based on current reality rather than stale assumptions. This closed-loop integration goes beyond DEXTER-LLM (which lacks formal safety), LLM-CBT (which lacks multi-formalism planning), and CLGA (which lacks runtime monitoring).
 
@@ -284,15 +303,34 @@ graph LR
 
 ---
 
-### 4.6 Multi-Robot System (MRS)
+### 4.6 Hardware Abstraction Layer (HAL) — Middleware-Agnostic Proxy
 
-The robot fleet operates in a **partially observable environment**:
+A critical systems contribution: the HAL provides a **universal middleware bridge** that decouples the cognitive layers from platform-specific protocols, enabling SAFEMRS to orchestrate robots across disparate software stacks:
+
+| Adapter                   | Protocol / Middleware       | Target Platforms                                                  |
+| ------------------------- | --------------------------- | ----------------------------------------------------------------- |
+| **ROS 2 Adapter**         | DDS (Data Distribution Service) | ROS 2 Humble / Jazzy robots (primary targets)                   |
+| **ROS 1 Bridge**          | rosbridge / topic relay     | Legacy ROS 1 systems via `ros1_bridge`                            |
+| **gRPC Adapter**          | Protocol Buffers over HTTP/2| Custom middleware, microservices-based robots                      |
+| **MAVLink/MAVROS**        | MAVLink v2                  | PX4-based UAVs, ArduPilot platforms                               |
+| **XRCE-DDS (Micro-ROS)**  | DDS-XRCE                   | Resource-constrained embedded systems (UUV microcontrollers)      |
+| **VLA Execution Bridge**  | Action token → motor command| Vision-Language-Action models (e.g., RT-2) for fine-grained manipulation |
+
+> **VLA Integration**: For tasks requiring fine-grained physical interaction (e.g., debris removal, survivor extraction), the VLA bridge translates high-level action commands + visual observations into direct motor tokens, bridging the gap between symbolic planning and continuous control. This is positioned as the "last mile" execution layer — the LLM plans, the VLA executes.
+
+---
+
+### 4.7 Multi-Robot System (MRS) — Embodiment-Aware Fleet
+
+The robot fleet operates in a **partially observable environment** with embodiment-aware allocation via **Robot Resumes**:
 
 | Feature                        | Description                                                                                                       |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| **Heterogeneous Capabilities** | Robots have different skills (aerial, ground, manipulation, sensing)                                              |
+| **Robot Resumes (URDF)**       | Each robot's URDF file is parsed to generate a textual "resume" summarizing its capabilities (payload, mobility, sensors, kinematic limits) — enabling the ARL to reason about hardware constraints during task allocation |
+| **Skill Ontology**             | A structured mapping from task requirements (e.g., "navigate water", "lift 5kg") to robot capabilities, ensuring embodiment-aware reasoning |
+| **Heterogeneous Capabilities** | Robots span diverse morphologies: UAVs (aerial), UGVs (ground), quadrupeds (rough terrain), UUVs (underwater), manipulators (grasping) |
 | **Inter-Robot Communication**  | Robots share observations, coordinate handoffs, and report status through a peer-to-peer mesh                     |
-| **Local Autonomy**             | Each robot has a local execution agent that interprets assigned sub-plans and handles low-level control           |
+| **Local Autonomy**             | Each robot has a local execution agent that interprets assigned sub-plans and handles low-level control (including VLA execution for fine-grained tasks) |
 | **External Resource Access**   | Robots may (optionally) query external MCP tools for real-time information (maps, sensor feeds, databases)        |
 | **Partial Observability**      | No single robot sees the full environment; the system must reason under uncertainty and fuse partial observations |
 
@@ -316,7 +354,7 @@ sequenceDiagram
     ARL->>ARL: Generate candidate plan (PDDL / BT / DAG)
 
     rect rgb(15, 52, 96)
-        Note over ARL,SRL: Dual-Channel Safety Verification
+        Note over ARL,SRL: Triple-Channel Safety Verification
         ARL->>SRL: Submit candidate plan
         SRL->>SRL: Formal Logic Check (LTL model checking)
         SRL->>SRL: LLM Safety CoT (invariants, conflicts)
@@ -372,6 +410,9 @@ sequenceDiagram
 | **Dependency modeling**           | ❌        | ❌       | ✅ (DAG) | ❌      | ❌         | ❌       | ❌        | ❌       | ❌       | ❌       | ❌       | ❌               | ❌           | **✅ (Abstract)**         |
 | **Partial observability**         | ❌        | ❌       | ❌       | ❌      | ✅         | ❌       | ❌        | ❌       | ❌       | ❌       | ❌       | ❌               | ❌           | **✅**                    |
 | **Inter-robot communication**     | ❌        | ❌       | ❌       | ❌      | ❌         | ❌       | ❌        | ❌       | ❌       | ❌       | ✅       | ❌               | ❌           | **✅**                    |
+| **VLA execution bridge**          | ❌        | ❌       | ❌       | ❌      | ❌         | ❌       | ❌        | ❌       | ❌       | ❌       | ❌       | Partial          | ❌           | **✅**                    |
+| **HAL middleware abstraction**    | ❌        | ❌       | ❌       | ❌      | ❌         | ❌       | ❌        | ❌       | ❌       | ❌       | ❌       | ❌               | ❌           | **✅ (6 adapters)**       |
+| **Embodiment-aware allocation**   | ❌        | ❌       | ❌       | ❌      | ❌         | ❌       | ❌        | ❌       | ❌       | ❌       | ❌       | ❌               | ❌           | **✅ (Robot Resumes)**   |
 
 ### 6.2 Positioning Against Key Related Works
 
@@ -428,7 +469,7 @@ AutoHMA-LLM's cloud/device LLM split is complementary to our architecture — it
 ## 7. Key Novel Contributions
 
 > [!IMPORTANT]
-> The following are the primary novelties of SAFEMRS that distinguish it from all 44 surveyed works:
+> The following are the primary novelties of SAFEMRS that distinguish it from all 46 surveyed works:
 
 ### Novelty 1: Triple-Channel Safety Verification (Formal + Probabilistic + Runtime)
 
@@ -449,6 +490,10 @@ Existing works commit to a single planning formalism — PDDL (LaMMA-P), behavio
 ### Novelty 5: Multi-Paradigm Safety Integration
 
 SAFEMRS uniquely synthesizes safety mechanisms from across the literature into a unified architecture: CBFs from SAFER, conformal prediction from S-ATLAS, syntax-guaranteed LTL from LTLCodeGen, hierarchical specifications from NL2HLTL2PLAN, prompt safety screening from SafePlan, and sliding-window verification from VerifyLLM. No prior work integrates more than two of these mechanisms.
+
+### Novelty 6: Embodiment-Aware Cognitive Proxy (HAL + VLA + Robot Resumes)
+
+SAFEMRS acts as a **verifiable cognitive proxy** between human intent and heterogeneous robot execution. The Hardware Abstraction Layer (HAL) bridges 6 middleware protocols (ROS 1, ROS 2, gRPC, MAVLink, XRCE-DDS, VLA), while **Robot Resumes** (URDF-derived textual capability summaries) enable the ARL to reason about embodiment constraints during task allocation. The **VLA execution bridge** provides a "last mile" connection from symbolic plans to continuous motor control for fine-grained manipulation — a capability no existing multi-robot LLM framework addresses.
 
 ---
 
@@ -482,7 +527,7 @@ SAFEMRS uniquely synthesizes safety mechanisms from across the literature into a
 
 ## 10. Summary
 
-SAFEMRS addresses ten critical gaps identified in the literature (46 papers, 2020–2025):
+SAFEMRS addresses thirteen critical gaps identified in the literature (46 papers, 2020–2025):
 
 | Gap                                         | How SAFEMRS Addresses It                                                      |
 | ------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -490,11 +535,14 @@ SAFEMRS addresses ten critical gaps identified in the literature (46 papers, 202
 | Closed-loop LLM planning                    | MCP-based external tool/knowledge augmentation                                |
 | No runtime safety enforcement               | CBF-based enforcement maintaining safety sets during execution (from SAFER)   |
 | No probabilistic safety bounds              | Conformal prediction calibration providing statistical guarantees (from S-ATLAS) |
-| No runtime monitoring                       | Structured RTM with anomaly detection and safety-preserving re-planning       |
+| No runtime monitoring                       | Structured RTM with PEFA closed-loop (anomaly detection + safety-preserving re-planning) |
 | Single planning formalism                   | Abstract layer supporting 8 backends (PDDL, BT, DAG, HTN, STL, FSM, Code, YAML) |
 | Static plan execution                       | Dynamic re-planning triggered by real-time monitoring via verified pipeline   |
 | No safety for code-generated plans          | Safety verification of generated code through formal + LLM channels           |
 | Limited partial observability support       | Fused observations from multiple robots + external sensors via MCP            |
 | Missing inter-robot communication           | Peer-to-peer robot coordination + multi-agent LLM dialog (inspired by RoCo)  |
+| No middleware-agnostic execution            | HAL with 6 adapters (ROS 1, ROS 2, gRPC, MAVLink, XRCE-DDS, VLA)            |
+| No embodiment-aware task allocation         | Robot Resumes (URDF-derived) enable capability-grounded reasoning             |
+| No symbolic→continuous control bridge       | VLA execution bridge for fine-grained manipulation tasks                      |
 
-By combining the strengths of agentic LLM reasoning, triple-channel safety verification, external resource augmentation, multi-formalism planning, and continuous monitoring, SAFEMRS provides the most comprehensive architecture for safe, adaptive multi-robot task planning in partially observable environments.
+By combining the strengths of agentic LLM reasoning, triple-channel safety verification, external resource augmentation, multi-formalism planning, embodiment-aware allocation via Robot Resumes, continuous monitoring with PEFA closed-loop adaptation, and a middleware-agnostic HAL with VLA execution, SAFEMRS provides the most comprehensive cognitive proxy architecture for safe, adaptive multi-robot task planning in partially observable environments.
