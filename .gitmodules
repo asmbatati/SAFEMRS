@@ -4,3 +4,12 @@
 [submodule "ros2_agent_sim"]
 	path = ros2_agent_sim
 	url = https://github.com/asmbatati/ros2_agent_sim.git
+[submodule "safemrs"]
+	path = safemrs
+	url = https://github.com/neuros-x/safemrs.git
+[submodule "safemrs_docker"]
+	path = safemrs_docker
+	url = https://github.com/neuros-x/safemrs_docker.git
+[submodule "safemrs_sim"]
+	path = safemrs_sim
+	url = https://github.com/neuros-x/safemrs_sim.git
