@@ -4,6 +4,61 @@
 
 ---
 
+## Session 9 — 2026-02-18 (Late Night)
+
+### 9.1 Complexity Evaluation & Multi-Venue Project Plan
+
+**Prompt:**
+> Read the CHANGELOG, architecture_proposal.md, and competitive_analysis.md. Evaluate the complexity of the current proposal. If too complex, suggest simplifications while ensuring rigor and novelty for IROS. Avoid salami-slicing. Also analyze the receding horizon planning / MPC idea in context. Write a feasible action plan in project_plan.md.
+
+**Created [project_plan.md](file:///g:/My%20Drive/02%20Areas/Career/PSU/Research/Active/MARS/IROS%20Paper/SAFEMRS/project_plan.md)** — 9-section project plan:
+
+| Section | Content |
+|---------|---------|
+| §1 Complexity Diagnosis | Quantified scope inventory: 8 major components, 19 features across 16 heatmap columns — **verdict: too complex** for a 6-page paper |
+| §2 Simplification Strategy | Core principle: "one deep idea per paper" with supporting contributions |
+| §3 RHP/MPC Idea Analysis | Mapped receding horizon planning to SAFEMRS (Model→World Model+KB, Constraints→LTL/CBF, Solve→ARL+SRL, Execute→first action, Observe→RTM); identified as **strong and differentiated** — no existing LLM-MRS paper formalizes planning as MPC |
+| §4 Multi-Venue Decomposition | 3-paper plan with anti-salami-slicing verification |
+| §5 Non-Overlap Matrix | Verified each paper has different RQ, baselines, metrics, venue type |
+| §6 Timeline | Gantt-style sequencing: Paper 1 → Paper 2 → Paper 3 (with parallel tracks) |
+| §7 Simplified Paper 1 | Cut from ~15 components to 5 for IROS feasibility |
+| §8 Action Items | Week-by-week breakdown of immediate next steps |
+| §9 Summary | Decision table with recommendations |
+
+**Key decisions:**
+
+| Paper | Focus | Venue | Core Contribution |
+|-------|-------|-------|-------------------|
+| **Paper 1** | Triple-channel corroborative safety verification | IROS 2026 | Formal proof that triple-channel fusion dominates subsets |
+| **Paper 2** | Receding horizon planning for LLM-MRS | ICRA 2027 | MPC-style formalization of LLM-based multi-robot planning |
+| **Paper 3** | Agentic cognitive proxy architecture | RA-L | MCP integration + Robot Resumes + HAL systems contribution |
+
+**Complexity reduction for Paper 1:**
+- Removed: MCP, 6/8 planning backends, HAL (6 adapters), VLA bridge, Robot Resumes, Skill Ontology, UUV/Quadruped
+- Kept: SRL (3 channels + fusion + conformal), basic ARL, 2 backends (PDDL + BT), basic RTM, UAV + UGV
+
+---
+
+## Session 8 — 2026-02-18 (Late Night)
+
+### 8.1 Resolve Git Submodules & Cleanup
+
+**Prompt:**
+> Fix `already exists in index` errors, switch to `neuros-x` repos, and delete `desktop.ini` files.
+
+**Actions:**
+- **Switched Remote Origin**: Replaced `asmbatati` submodules with **`neuros-x` organization** repositories:
+  - `safemrs` (Core)
+  - `safemrs_sim` (Simulation)
+  - `safemrs_docker` (Infrastructure)
+- **Cleanup**: Recursively deleted `desktop.ini` files to resolve "untracked content" warnings.
+
+**Outcome:**
+- All 3 submodules successfully registered from `neuros-x`.
+- Repository status clean.
+
+---
+
 ## Session 7 — 2026-02-16 (Evening)
 
 ### 7.1 Analyze Implementation Repositories
