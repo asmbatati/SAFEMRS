@@ -1,0 +1,39 @@
+graph TD
+    FV["FormalVerifier.verify(plan)"]
+
+    LTL_V["LTL Verifier
+    ─────────────────────────
+    1. Convert plan to state sequence
+    2. Encode boolean APs per timestep
+    3. Stutter-extend finite trace x 100
+    4. Build Buchi word automaton via Spot+BDD
+    5. Product with neg-phi, check emptiness"]
+    
+    PDDL_V["PDDL Validator
+    ─────────────────────────
+    1. Convert plan to PDDL strings
+    2. Run SequentialSimulator for preconditions
+    3. Check concurrent location overlap
+    corridors, doorways, charging station"]
+    
+    DEON_V["Deontic Checker
+    ─────────────────────────
+    Permission P: robot may do action
+    Obligation O: robot must do action
+    Forbidden F: robot must NOT do action"]
+
+    SPECS["LTL Spec Library
+    ─────────────────────────
+    spatial: corridor_exclusion, landing_clearance
+    temporal: roof_before_enter, survey_before_report
+    resource: charging_mutex
+    battery: drone_range, mission_within_range
+    All APs must be BOOLEAN
+    battery_ok = battery above 10 percent
+    battery_critical = battery at or below 5 percent
+    mission_within_range = duration within max_flight_time"]
+
+    FV --> LTL_V
+    FV --> PDDL_V
+    FV --> DEON_V
+    LTL_V --- SPECS

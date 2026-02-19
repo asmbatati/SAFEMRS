@@ -1,0 +1,25 @@
+graph LR
+    JSON["JSON dict
+    (from LLM planner)"]
+    PDDL_FILE["PDDL domain+problem
+    (for formal verifier)"]
+    BT_XML["BehaviorTree XML
+    (for ROS 2 executor)"]
+
+    IP["🏛️ InternalPlan
+    ─────────────────
+    plan_id, command
+    actions: list[Action]
+    dependencies: list[Dependency]
+    robots: dict[str, RobotSpec]"]
+
+    JSON -- "from_json()" --> IP
+    IP -- "to_json()" --> JSON
+    IP -- "to_pddl()" --> PDDL_FILE
+    IP -- "to_bt_xml()" --> BT_XML
+
+    note1["❌ from_pddl: not needed
+    ❌ from_bt_xml: not needed
+    (IROS scope)"]
+    PDDL_FILE -.->|"NotImplementedError"| note1
+    BT_XML -.->|"NotImplementedError"| note1

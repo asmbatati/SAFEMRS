@@ -1,0 +1,38 @@
+graph TD
+    LR["LLMSafetyReasoner.verify(plan)"]
+
+    SR1["InvariantReasoner
+    Checks: global state invariants
+    formally-expressible constraints
+    that slip through the spec library"]
+    SR2["ConflictDetector
+    Checks: resource races
+    timing conflicts between actions
+    duplicate assignments"]
+    SR3["CommonsenseAnalyzer
+    Checks: environmental dangers
+    fans, water, heat, unwritten
+    safety norms, human proximity"]
+    SR4["PhysicalValidator
+    Checks: robot-task mismatch
+    quadruped climbing, drone swimming
+    carry capacity, height limits"]
+
+    DEDUP["_deduplicate_hazards()
+    Key = frozenset of affected_actions plus severity
+    Keep highest-confidence copy"]
+    CALIB["_calibrate()
+    Platt-scaling logistic regression
+    Raw LLM confidence to calibrated probability"]
+
+    LR --> SR1 & SR2 & SR3 & SR4
+    SR1 & SR2 & SR3 & SR4 --> DEDUP --> CALIB
+
+    BASE["SubReasonerBase (shared)
+    ─────────────────────────
+    temperature=0.0, seed=42
+    response_format=json_object
+    SHA-256 response cache
+    max_retries=2 with JSON validation
+    Fallback: verdict safe, confidence 0.0, parse_failure True"]
+    SR1 & SR2 & SR3 & SR4 --- BASE

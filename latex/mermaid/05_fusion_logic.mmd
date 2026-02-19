@@ -1,0 +1,27 @@
+graph LR
+    VF["v_F: Formal verdict
+    Safe or Unsafe"]
+    VL["v_L: LLM verdict
+    Safe or Unsafe"]
+
+    FUSE["SEVERITY_MAP lookup"]
+
+    A["✅ Approve
+    risk_level = none
+    Allow execution"]
+    B["❌ Reject
+    risk_level = critical
+    Block execution"]
+    C1["⚠️ Review
+    risk_level = medium
+    Formal sees it, LLM misses"]
+    C2["⚠️ Review
+    risk_level = low
+    LLM sees it, formal misses"]
+
+    VF --> FUSE
+    VL --> FUSE
+    FUSE -->|"Safe + Safe"| A
+    FUSE -->|"Unsafe + Unsafe"| B
+    FUSE -->|"Unsafe + Safe"| C1
+    FUSE -->|"Safe + Unsafe"| C2
